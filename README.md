@@ -56,6 +56,14 @@ misc/MarkovianPCG.gd:96: Error: Function argument name "aOrigin" is not valid (f
 misc/MarkovianPCG.gd:96: Error: Function argument name "aPos" is not valid (function-argument-name)
 ```
 
+### GitHub Actions annotations
+
+Use `--output-format github` to render lint findings as inline annotations on PRs and check runs:
+
+```bash
+gdlint --output-format github source/
+```
+
 ## Formatting with gdformat [(more)](https://github.com/Scony/godot-gdscript-toolkit/wiki/4.-Formatter)
 
 **Formatting may lead to data loss, so it's highly recommended to use it along with Version Control System (VCS) e.g. `git`**

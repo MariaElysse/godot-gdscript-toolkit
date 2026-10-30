@@ -10,6 +10,7 @@ Usage:
 
 Options:
   -d --dump-default-config   Dump default config to 'gdlintrc' file
+  -o --output-format <fmt>   Output format: text, github (default: text)
   -v --verbose               Show extra prints
   -h --help                  Show this screen.
   --version                  Show version.
@@ -27,7 +28,7 @@ import yaml
 from docopt import docopt
 
 from gdtoolkit.linter import lint_code, DEFAULT_CONFIG
-from gdtoolkit.linter.problem_printer import print_problem
+from gdtoolkit.linter.problem_printer import print_problem, print_problem_github
 from gdtoolkit.common.exceptions import (
     lark_unexpected_token_to_str,
     lark_unexpected_input_to_str,
@@ -46,6 +47,8 @@ def main():
         version="gdlint {}".format(pkg_version("gdtoolkit")),
     )
 
+    output_format = arguments["--output-format"] or "text"
+
     if arguments["--verbose"]:
         logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
@@ -63,7 +66,7 @@ def main():
         arguments["<path>"], excluded_directories=set(config["excluded_directories"])
     )
     for file_path in files:
-        problems_total += _lint_file(file_path, config)
+        problems_total += _lint_file(file_path, config, output_format)
 
     if problems_total > 0:
         print(
@@ -127,14 +130,19 @@ def _update_config_with_missing_entries_inplace(config: dict) -> None:
             config[key] = DEFAULT_CONFIG[key]
 
 
-def _lint_file(file_path: str, config: MappingProxyType) -> int:
+def _lint_file(
+    file_path: str, config: MappingProxyType, output_format: str = "text"
+) -> int:
     try:
         with open(file_path, "r", encoding="utf-8") as handle:
             content = handle.read()
             problems = lint_code(content, config)
             if len(problems) > 0:  # TODO: friendly frontend like in halint
                 for problem in problems:
-                    print_problem(problem, file_path)
+                    if output_format == "github":
+                        print_problem_github(problem, file_path)
+                    else:
+                        print_problem(problem, file_path)
             return len(problems)
     except OSError as exception:
         print(
