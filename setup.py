@@ -18,8 +18,13 @@ setup(
         "gdtoolkit.common",
         "gdtoolkit.gd2py",
         "gdtoolkit.gdradon",
+        "gdtoolkit.gdformat2",
+        "gdtoolkit.gdformat2.parser",
     ],
-    package_data={"gdtoolkit.parser": ["gdscript.lark", "comments.lark"]},
+    package_data={
+        "gdtoolkit.parser": ["gdscript.lark", "comments.lark"],
+        "gdtoolkit.gdformat2.parser": ["gdscript.lark", "comments.lark"],
+    },
     entry_points={
         "console_scripts": [
             "gdparse = gdtoolkit.parser.__main__:main",
@@ -27,6 +32,8 @@ setup(
             "gdformat = gdtoolkit.formatter.__main__:main",
             "gd2py = gdtoolkit.gd2py.__main__:main",
             "gdradon = gdtoolkit.gdradon.__main__:main",
+            "gdformat2 = gdtoolkit.gdformat2.__main__:main",
+            "gdformat2-lint = gdtoolkit.gdformat2.lint:main",
         ]
     },
     include_package_data=True,
