@@ -1,0 +1,610 @@
+// =============================================================================
+//  GDScript 4.4 — Lark grammar
+// =============================================================================
+//
+//  A syntax-only grammar for the GDScript language implemented by Godot 4.4.
+//  It is written for Lark (https://github.com/lark-parser/lark) and follows the
+//  reference implementation, not just the (older, partially outdated) EBNF in
+//  the Godot documentation:
+//
+//    modules/gdscript/gdscript_tokenizer.cpp
+//    modules/gdscript/gdscript_parser.cpp
+//    (godotengine/godot, branch 4.4, commit b054055b2a09ac38bc5ba0c7a5cc15c3f8e7b686)
+//
+//  Design notes
+//  ------------
+//  * Blocks are indentation based. Lark does not lex INDENT/DEDENT itself, so
+//    this grammar declares them and expects a postlexer built on
+//    `lark.indenter.Indenter`. Point it at `_NL` / `_INDENT` / `_DEDENT` and at
+//    the GDScript bracket tokens. The complete postlexer lives in
+//    `gdscript_parser.py` (GDScriptIndenter). It also extracts every comment
+//    from `_NL` and attaches it to the AST as `comment` nodes (use
+//    `gdscript_parser.parse(src)`). Its essence is:
+//
+//        class GDScriptIndenter(Indenter):
+//            NL_type = "_NL"
+//            OPEN_PAREN_types = ["PARENTHESIS_OPEN", "BRACKET_OPEN", "BRACE_OPEN"]
+//            CLOSE_PAREN_types = ["PARENTHESIS_CLOSE", "BRACKET_CLOSE", "BRACE_CLOSE"]
+//            INDENT_type = "_INDENT"
+//            DEDENT_type = "_DEDENT"
+//            tab_len = 4
+//
+//        parser = Lark.open("gdscript.lark", parser="earley",
+//                           ambiguity="resolve",
+//                           postlex=GDScriptIndenter())
+//
+//    `_NL` swallows blank lines and comments, so blank lines never influence
+//    indentation. Inside brackets the postlexer suppresses newlines, matching
+//    GDScriptTokenizerText::scan(). Backslash line continuations are ignored
+//    before the postlexer ever sees them.
+//  * Earley is the recommended (and default) algorithm. Array patterns and
+//    array literals share a prefix (`[1, var x]` can only be a pattern, while
+//    `[1, 2]` can be read either way), so LALR(1) cannot cover all of GDScript.
+//    The `array_pattern.2`, `dict_pattern.2` and `match_pattern.3` priorities
+//    select structural patterns when a match branch is genuinely ambiguous.
+//    Do not combine a postlexer with Lark's `dynamic` lexer; Earley + the
+//    default basic lexer + an Indenter is the supported combination.
+//  * The grammar is *syntactic*. Name resolution, duplicate declarations,
+//    annotation targets/arity, dictionary-style mixing, `break` outside a loop,
+//    "no mandatory parameter after an optional one", typed-collection arity and
+//    "rest must be last" are checked by GDScriptParser afterwards. Those
+//    restrictions are called out in comments instead of being encoded.
+//  * Spellings accepted by the tokenizer are all represented: annotations,
+//    `:=` inference, raw / StringName / NodePath strings, hex and binary
+//    numbers with `_` separators, `when` guards, `super`, `static var`,
+//    typed collections, `breakpoint`, and backslash continuations.
+//  * Soft keywords: GDScript permits `match` and `when` as ordinary identifiers
+//    for backwards compatibility. A pure CFG cannot make that choice by text,
+//    so they are accepted where the parser itself accepts keywords as names
+//    (attribute and node names), but not as standalone expression identifiers.
+//
+//  Reserved by the tokenizer in 4.4 and deliberately not given a production:
+//  `namespace`, `trait` and `yield` (the latter diagnoses "use await").
+//
+//  Validated by parsing this repository's feature corpus and 31 unmodified
+//  scripts from godotengine/godot-demo-projects (master).
+//
+// =============================================================================
+
+
+// -----------------------------------------------------------------------------
+//  1. Start symbol and class layout
+// -----------------------------------------------------------------------------
+
+start: (file_item | _NL)*
+
+// The reference parser only allows `extends` and `class_name` once each, in
+// either order, before class members. Enforcement is semantic; this grammar
+// accepts them anywhere at file scope.
+?file_item: extends_stmt
+          | class_name_stmt
+          | annotation
+          | class_member
+
+extends_stmt: EXTENDS extends_target end?
+class_name_stmt: CLASS_NAME NAME [EXTENDS extends_target] end?
+
+extends_target: STRING (PERIOD NAME)*
+              | NAME (PERIOD NAME)*
+
+// Annotations are parsed before their target. Making them standalone items
+// keeps this grammar free of annotation/target ambiguity; the reference parser
+// attaches them to the following declaration.
+annotation: ANNOTATION [PARENTHESIS_OPEN [arguments] PARENTHESIS_CLOSE] _NL?
+
+// Standalone string literals are accepted as multi-line "comment" text.
+bare_string: STRING
+
+class_member: variable_decl end?          // class variables may be static
+            | constant_decl end?
+            | signal_decl end?
+            | enum_decl end?
+            | function_decl
+            | inner_class
+            | pass_stmt end?
+            | bare_string end?
+
+inner_class: STATIC? CLASS NAME [EXTENDS extends_target] COLON class_body
+?class_body: class_block
+           | class_member                  // one-line body: `class Foo: pass`
+           | inline_class_body
+// A one-line body with several members: `class Foo: var a; var b`. Its own rule with a
+// priority, because the first member's optional `end` can otherwise take the semicolon
+// and leave every later member outside the class as a sibling declaration.
+inline_class_body.2: class_member (SEMICOLON+ class_member)* SEMICOLON* _NL?
+// An inner class may declare its base with `extends Target` as a body statement
+// as well as in the header (`class Foo extends Target:`). Both are legal; the
+// formatter keeps a header base on the declaration line, which is what the style
+// guide asks for.
+class_block: _NL _INDENT (annotation | class_member | extends_stmt | _NL)* _DEDENT
+
+
+// -----------------------------------------------------------------------------
+//  2. Class members
+// -----------------------------------------------------------------------------
+
+// `static` is only valid before `var` and `func`.
+// An explicit/inferred type is required in front of an inline accessor list:
+// without it, `var x: Float = 1` would be indistinguishable from a property
+// whose getter is named `Float` (get/set are contextual, not keywords).
+?variable_decl: STATIC? VAR NAME [EQUAL expression]
+              | STATIC? VAR NAME COLON type [EQUAL expression] [property]
+              | STATIC? VAR NAME COLON EQUAL expression [property]
+              | STATIC? VAR NAME property
+              | STATIC? VAR NAME untitled_property
+              | STATIC? VAR NAME EQUAL expression property
+
+// Local variables cannot be `static` and cannot have property accessors.
+?local_variable: VAR NAME [EQUAL expression]
+               | VAR NAME COLON type [EQUAL expression]
+               | VAR NAME COLON EQUAL expression
+
+?constant_decl: CONST NAME EQUAL expression
+              | CONST NAME COLON type EQUAL expression
+              | CONST NAME COLON EQUAL expression
+
+signal_decl: SIGNAL NAME [PARENTHESIS_OPEN [signal_parameters] PARENTHESIS_CLOSE]
+signal_parameters: signal_parameter (COMMA [signal_parameter])*
+signal_parameter: NAME [COLON type]
+
+enum_decl: ENUM (NAME)? BRACE_OPEN [enum_entries] BRACE_CLOSE
+enum_entries: enum_entry (COMMA [enum_entry])*
+enum_entry: NAME [EQUAL expression]
+
+function_decl: STATIC? FUNC NAME PARENTHESIS_OPEN [parameters] PARENTHESIS_CLOSE [FORWARD_ARROW return_type] [COLON suite]
+
+parameters: parameter (COMMA [parameter])*
+?parameter: NAME [EQUAL expression]
+          | NAME COLON type [EQUAL expression]
+          | NAME COLON EQUAL expression
+          | PERIOD_PERIOD_PERIOD NAME [COLON type]     // variadic, must be last
+
+// `get` / `set` are contextual in GDScript. The reference parser compares the
+// identifier text; a CFG cannot, so this production accepts any identifier in
+// the accessor slot and leaves `get`/`set` validation to a later pass.
+property: COLON property_accessor (COMMA [property_accessor])*
+        | COLON _NL _INDENT (_NL | property_accessor_line)+ _DEDENT
+property_accessor_line: property_accessor COMMA? end?
+property_accessor: accessor_name PARENTHESIS_OPEN [NAME] PARENTHESIS_CLOSE (COLON suite | EQUAL NAME)
+                 | accessor_name (COLON suite | EQUAL NAME)
+// The accessor's name is a plain identifier, except that the contextual keyword itself
+// arrives as its own terminal when the postlexer recognises the accessor slot.
+?accessor_name: NAME | GET_SET
+
+// A property with no explicit type: `var x: set = _set, get = _get`. Its first accessor
+// must be the contextual keyword itself, so `var x: Float = 1` stays a typed declaration
+// (`Float` is a NAME, not GET_SET) and the property reading is the only one for
+// `var x: set = _set`. The priority settles the remaining overlap, where `set` could
+// also be read as the type.
+untitled_property.2: COLON GET_SET property_accessor_body (COMMA [property_accessor])*
+property_accessor_body: PARENTHESIS_OPEN [NAME] PARENTHESIS_CLOSE (COLON suite | EQUAL NAME)
+                      | (COLON suite | EQUAL NAME)
+
+
+// -----------------------------------------------------------------------------
+//  3. Statements and indented bodies
+// -----------------------------------------------------------------------------
+
+// An inline suite is always single-line, e.g. `if ready: return true`.
+// A block suite is `NEWLINE INDENT statement+ DEDENT`.
+// A lambda body consumes its own final NEWLINE (the reference parser tracks
+// this with its `lambda_ended` flag). Terminators are therefore optional here;
+// ordinary statements still get a NEWLINE from their own `end` whenever one is
+// present, and `suite` remains one statement per line.
+// Suite rules modified to eliminate Earley ambiguity for function calls.
+// Function call expressions (NAME followed by parenthesized args) are handled
+// explicitly in suite_line to prevent the parser from splitting NAME and call_suffix
+// across different parse branches when multiple statements follow each other.
+suite: _NL _INDENT (_NL | suite_line)+ _DEDENT
+     | simple_statement (SEMICOLON+ simple_statement)* SEMICOLON* _NL?
+
+// Do NOT give this rule a positive priority. Priority is summed along a derivation,
+// and this rule is instantiated per statement line, so `?suite_line.10:` made Earley
+// prefer the reading that splits `func(x): pass;pass` into suite_line(lambda) + `;`
+// (via `end: SEMICOLON+`) + suite_line(pass) - two suite_lines outscore one - which
+// silently drops every statement after the first from an inline lambda body. With no
+// priority the call-statement grouping is unchanged (the `function_call_expr` rule
+// decides that ambiguity), and the inline lambda body keeps its statements.
+?suite_line: local_variable end?
+              | constant_decl end?
+              | flow_stmt end?
+              | assert_stmt end?
+              | pass_stmt end?
+              | function_call_expr end?
+              | assignment_stmt end?
+              | expression_stmt end?
+              | compound_statement
+              | annotation
+
+// Explicitly match NAME followed by parenthesized arguments to keep them together.
+// This prevents Earley from splitting function calls across partial parse branches.
+function_call_expr: NAME call_suffix
+
+end: _NL | SEMICOLON+
+
+?simple_statement: local_variable
+                 | constant_decl
+                 | flow_stmt
+                 | assert_stmt
+                 | pass_stmt
+                 | assignment_stmt
+                 | expression_stmt
+
+?compound_statement: if_stmt
+                   | for_stmt
+                   | while_stmt
+                   | match_stmt
+
+// A bare expression used as a statement, e.g. `1_000_000 > 0` or
+// `await get_tree().process_frame`. `cast` (not `expression`) is the operand so
+// that an assignment statement is not also readable as an expression statement.
+// The rule is given a negative priority: when the same tokens also parse as
+// `function_call_expr` (a bare call statement), Earley must keep the call form,
+// because the formatter dispatches on it.
+expression_stmt.-1000: cast
+
+// An assignment used as a statement, e.g. `health += amount`, `position.x = 0`.
+// The operator is required, which keeps it unambiguous against `function_call_expr`
+// (a bare call statement has no assignment operator). The left side is a reference
+// (name/self plus attribute/subscript chains), not an arbitrary postfix, so a typed
+// declaration such as `var a: Array[int] = [1]` is not split at the `[int] =` boundary.
+assignment_stmt: assignable assignment_operator assignment
+?assignable: (NAME | SELF | get_node_expr) postfix_op*
+
+pass_stmt: PASS
+flow_stmt: RETURN [expression]
+         | BREAK
+         | CONTINUE
+         | BREAKPOINT
+
+assert_stmt: ASSERT PARENTHESIS_OPEN expression [COMMA expression] PARENTHESIS_CLOSE
+
+if_stmt: IF expression COLON suite (ELIF expression COLON suite)* (ELSE COLON suite)?
+
+for_stmt: FOR NAME [COLON type] IN expression COLON suite
+
+while_stmt: WHILE expression COLON suite
+
+
+// -----------------------------------------------------------------------------
+//  4. `match`
+// -----------------------------------------------------------------------------
+
+match_stmt: MATCH expression COLON _NL _INDENT (_NL | match_item)+ _DEDENT
+
+?match_item: annotation
+           | pass_stmt end                       // `pass` as an empty body
+           | match_branch
+
+// `when` pattern guards are implemented in GDScriptParser::parse_match_branch().
+match_branch: match_pattern (COMMA match_pattern)* [WHEN expression] COLON suite
+
+// Array/dict patterns are syntactically close to array/dict literals, which are
+// also valid expressions in a pattern. The two readings are deliberately both
+// available; Earley with `ambiguity="resolve"` picks the higher-priority
+// structural pattern. The reference parser likewise tries those first.
+?match_pattern.3: VAR NAME                           // binding
+               | array_pattern
+               | dict_pattern
+               | expression                          // literal/constant/expression
+
+array_pattern.2: BRACKET_OPEN [array_pattern_items] BRACKET_CLOSE
+array_pattern_items: array_pattern_item (COMMA [array_pattern_item])*
+?array_pattern_item: PERIOD_PERIOD                    // rest, must be last
+                   | match_pattern
+
+dict_pattern.2: BRACE_OPEN [dict_pattern_items] BRACE_CLOSE
+dict_pattern_items: dict_pattern_entry (COMMA [dict_pattern_entry])*
+?dict_pattern_entry: PERIOD_PERIOD                    // rest, must be last
+                   | expression [COLON match_pattern]
+
+
+// -----------------------------------------------------------------------------
+//  5. Types
+// -----------------------------------------------------------------------------
+//
+// `Node`, `Node.Inner`, `Array[int]`, `Dictionary[String, Node]`. The reference
+// parser rejects nested typed collections and arity mismatches semantically.
+type: NAME (PERIOD NAME)* [BRACKET_OPEN type (COMMA [type])* BRACKET_CLOSE]
+
+return_type: type | VOID
+
+
+// -----------------------------------------------------------------------------
+//  6. Expressions (ordered lowest -> highest precedence)
+// -----------------------------------------------------------------------------
+//
+// Mirrors GDScriptParser::Precedence. Assignment and the ternary operator are
+// right-associative; the remaining binary operators associate to the left.
+// `**` associates to the left too — unlike Python — because
+// parse_binary_operator() parses its right side at precedence + 1.
+// `is` binds tighter than `**` (PREC_TYPE_TEST > PREC_POWER) while `await`
+// binds tighter than both (PREC_AWAIT).
+
+?expression: assignment
+           // A lambda is an expression but NOT part of the operator chain. That
+           // keeps it out of the assignment LHS; otherwise `var m = func(): var x=1`
+           // also parses as `var m = ((func(): var x) = 1)`, and Earley picks that
+           // reading, silently dropping the initializer from the lambda body.
+           | lambda
+?assignment: cast [assignment_operator assignment]
+assignment_operator: EQUAL | PLUS_EQUAL | MINUS_EQUAL | STAR_EQUAL | STAR_STAR_EQUAL
+                   | SLASH_EQUAL | PERCENT_EQUAL | LESS_LESS_EQUAL
+                   | GREATER_GREATER_EQUAL | AMPERSAND_EQUAL | PIPE_EQUAL | CARET_EQUAL
+
+// `X as T`: the operand is the whole expression to the LEFT of `as`, so this rule sits
+// above the operator chain and absorbs it. Godot reads `1.5 + 1 as int` as
+// `(1.5 + 1) as int`, which is why the operand cannot be a tighter rule.
+?cast: ternary ([AS type])*
+
+// ...and a cast is itself a valid LEFT operand of every operator, so each level below
+// carries a `cast_left` alternative: `1 as int or x` is `(1 as int) or x`, and Godot
+// reads `1 as int ** 2` as `(1 as int) ** 2`. The alternative demands the cast first and
+// keeps each level's own operand cast-free, so it can only match input the `cast` rule
+// above cannot already consume and adds no ambiguity. Without this, `1 as int or x` - a
+// cast followed by a binary operator - does not parse at all.
+cast_left: type_test (AS type)+ -> cast
+
+?ternary: logic_or [IF logic_or ELSE ternary]
+        | cast_left IF logic_or ELSE ternary
+
+?logic_or: logic_and ((OR | PIPE_PIPE) logic_and)*
+         | cast_left ((OR | PIPE_PIPE) logic_and)+
+?logic_and: logic_not ((AND | AMPERSAND_AMPERSAND) logic_not)*
+          | cast_left ((AND | AMPERSAND_AMPERSAND) logic_not)+
+?logic_not: (NOT | BANG) logic_not
+          | content_test
+
+?content_test: comparison ((IN | NOT IN) comparison)*
+             | cast_left ((IN | NOT IN) comparison)+
+?comparison: bit_or (comparison_operator bit_or)*
+           | cast_left (comparison_operator bit_or)+
+comparison_operator: LESS | LESS_EQUAL | GREATER | GREATER_EQUAL | EQUAL_EQUAL | BANG_EQUAL
+
+?bit_or: bit_xor (PIPE bit_xor)*
+       | cast_left (PIPE bit_xor)+
+?bit_xor: bit_and (CARET bit_and)*
+        | cast_left (CARET bit_and)+
+?bit_and: bit_shift (AMPERSAND bit_shift)*
+        | cast_left (AMPERSAND bit_shift)+
+?bit_shift: additive ((LESS_LESS | GREATER_GREATER) additive)*
+          | cast_left ((LESS_LESS | GREATER_GREATER) additive)+
+?additive: factor ((PLUS | MINUS) factor)*
+         | cast_left ((PLUS | MINUS) factor)+
+?factor: sign ((STAR | SLASH | PERCENT) sign)*
+       | cast_left ((STAR | SLASH | PERCENT) sign)+
+
+// Prefix operators, from weakest to strongest: `+ -` (PREC_SIGN), `~`
+// (PREC_BIT_NOT). Their operands can therefore contain `**` and `is`.
+?sign: (PLUS | MINUS) sign
+     | bit_not
+?bit_not: TILDE bit_not
+        | power
+
+// POWER, left-associative in GDScript. Allow a unary sign on the right operand
+// so `2.0 ** -1` remains valid.
+?power: type_test (STAR_STAR power_operand)*
+      | cast_left (STAR_STAR power_operand)+
+?power_operand: type_test
+              | (PLUS | MINUS) power_operand
+
+// TYPE_TEST and AWAIT bind tighter than arithmetic. `is`/`as` chains
+// (`1 is int is bool`, `1 as int as int`) repeat; each test/cast left-associates.
+?type_test: await_expr ([IS [NOT] type])*
+          | cast_left (IS [NOT] type)+
+?await_expr: AWAIT await_expr
+           // A lambda is only an `expression` alternative, not a chain operand:
+           // that keeps it out of `primary`/`postfix` (so `func(x): return (expr)`
+           // is not read as a bare `return` with `(expr)` called on the lambda) and
+           // out of the assignment LHS (see `expression` above).
+           | postfix
+
+
+// -----------------------------------------------------------------------------
+//  7. Postfix chains and primary expressions
+// -----------------------------------------------------------------------------
+
+?postfix: primary postfix_op*
+?postfix_op: call_suffix | attribute | subscript
+
+call_suffix: PARENTHESIS_OPEN [arguments] PARENTHESIS_CLOSE
+arguments: expression (COMMA [expression])*
+attribute: PERIOD attribute_name
+subscript: BRACKET_OPEN expression BRACKET_CLOSE
+
+?primary: STRING | NUMBER | TRUE | FALSE | NULL
+        | NAME
+        | SELF
+        | PI | TAU | INF | NAN
+        | PARENTHESIS_OPEN expression PARENTHESIS_CLOSE
+        | array_literal
+        | dict_literal
+        | preload_expr
+        | get_node_expr
+        | super_expr
+
+array_literal: BRACKET_OPEN [elements] BRACKET_CLOSE
+elements: expression (COMMA [expression])*
+
+// Both dictionary spellings are accepted individually. GDScript forbids mixing
+// `key: value` and `key = value` in one literal; that is semantic.
+dict_literal: BRACE_OPEN [dict_entries] BRACE_CLOSE
+dict_entries: dict_entry (COMMA [dict_entry])*
+?dict_entry: (NAME | STRING) EQUAL expression        // Lua-style
+           | expression COLON expression             // Python-style
+
+lambda: FUNC (NAME)? PARENTHESIS_OPEN [parameters] PARENTHESIS_CLOSE [FORWARD_ARROW return_type] COLON suite
+
+preload_expr: PRELOAD PARENTHESIS_OPEN expression PARENTHESIS_CLOSE
+
+// `$Path/To/Node`, `$"a path"/Child`, `%Unique`, `%Unique/Child`. A node path
+// may contain keywords (Token::is_node_name()); `%` is only valid at the start
+// of a path segment.
+get_node_expr: DOLLAR (SLASH | PERCENT)? node_path_segment ((SLASH | PERCENT) node_path_segment)*
+             | PERCENT node_path_segment ((SLASH | PERCENT) node_path_segment)*
+node_path_segment: STRING | NAME | node_name_keyword
+
+// `super()` (same method in the parent) and `super.method(...)`.
+super_expr: SUPER PARENTHESIS_OPEN [arguments] PARENTHESIS_CLOSE
+          | SUPER PERIOD attribute_name PARENTHESIS_OPEN [arguments] PARENTHESIS_CLOSE
+
+attribute_name: NAME | node_name_keyword
+
+// Token::is_node_name(): keywords accepted after `.` and inside `$` paths.
+// `true`, `false` and `null` are literals, not identifiers, and are excluded.
+node_name_keyword: AND | AS | ASSERT | AWAIT | BREAK | BREAKPOINT
+                 | CLASS | CLASS_NAME | CONST | CONTINUE
+                 | ELIF | ELSE | ENUM | EXTENDS
+                 | FOR | FUNC | IF | IN | IS
+                 | MATCH | NAMESPACE | NOT | OR
+                 | PASS | PRELOAD | RETURN | SELF
+                 | SIGNAL | STATIC | SUPER | TRAIT
+                 | VAR | VOID | WHEN | WHILE | YIELD
+                 | PI | TAU | INF | NAN
+
+
+// -----------------------------------------------------------------------------
+//  8. Whitespace, newlines and comments
+// -----------------------------------------------------------------------------
+
+// The indenter needs the indentation *after* the last newline in the token.
+// Including COMMENT keeps comment-only lines from disturbing indentation.
+_NL: ( /\r?\n[\t ]*/ | COMMENT )+
+
+%ignore /[ \t\f]+/
+%ignore COMMENT
+%ignore LINE_CONTINUATION
+COMMENT: /#[^\n]*/
+LINE_CONTINUATION: /\\\r?\n/
+
+// Supplied by the postlexer, not by the lexer.
+%declare _INDENT _DEDENT
+
+
+// -----------------------------------------------------------------------------
+//  9. Terminals — names follow GDScriptTokenizer::Token
+// -----------------------------------------------------------------------------
+
+ANNOTATION: /@[^\W\d]\w*/
+
+// Includes raw strings (r""), StringNames (&"") and NodePaths (^""), plus
+// single-, double- and triple-quoted forms. Escape sequences are not validated.
+STRING: /[r&^]?("""(?:\\[\s\S]|[^\\])*?"""|'''(?:\\[\s\S]|[^\\])*?'''|"(?:\\[\s\S]|[^"\\\n])*"|'(?:\\[\s\S]|[^'\\\n])*')/
+
+// Hex, binary, decimal integers/floats with single `_` separators, fractions
+// (`.5`, `1.`) and exponents. `1..2` is kept as NUMBER RANGE NUMBER.
+NUMBER: /0[xX][0-9a-fA-F](?:_?[0-9a-fA-F])* | 0[bB][01](?:_?[01])* | (?:[0-9](?:_?[0-9])*)?\.[0-9](?:_?[0-9])*(?:[eE][+-]?[0-9](?:_?[0-9])*)? | [0-9](?:_?[0-9])*\.(?!\.)(?:[0-9](?:_?[0-9])*)?(?:[eE][+-]?[0-9](?:_?[0-9])*)? | [0-9](?:_?[0-9])*(?:[eE][+-]?[0-9](?:_?[0-9])*)?/x
+
+// Unicode XID_Start/XID_Continue approximation; the tokenizer allows Unicode
+// identifiers and rejects confusable ones in debug builds.
+NAME: /[^\W\d]\w*/
+// The contextual accessor keywords. Kept as their own terminal so a CFG can tell
+// `var x: set = _set` (a property) from `var x: Float = 1` (a typed declaration);
+// both are NAMEs to the reference lexer.
+GET_SET: "get" | "set"
+TRUE: "true"
+FALSE: "false"
+NULL: "null"
+SELF: "self"
+PI: "PI"
+TAU: "TAU"
+INF: "INF"
+NAN: "NAN"
+
+// Keywords
+AS: "as"
+AND: "and"
+ASSERT: "assert"
+AWAIT: "await"
+BREAK: "break"
+BREAKPOINT: "breakpoint"
+CLASS: "class"
+CLASS_NAME: "class_name"
+CONST: "const"
+CONTINUE: "continue"
+ELIF: "elif"
+ELSE: "else"
+ENUM: "enum"
+EXTENDS: "extends"
+FOR: "for"
+FUNC: "func"
+IF: "if"
+IN: "in"
+IS: "is"
+MATCH: "match"
+NAMESPACE: "namespace"     // reserved in 4.4
+NOT: "not"
+OR: "or"
+PASS: "pass"
+PRELOAD: "preload"
+RETURN: "return"
+SIGNAL: "signal"
+STATIC: "static"
+SUPER: "super"
+TRAIT: "trait"             // reserved in 4.4
+VAR: "var"
+VOID: "void"
+WHEN: "when"
+WHILE: "while"
+YIELD: "yield"             // reserved/removed: use await
+
+// Comparison
+LESS: "<"
+LESS_EQUAL: "<="
+GREATER: ">"
+GREATER_EQUAL: ">="
+EQUAL_EQUAL: "=="
+BANG_EQUAL: "!="
+
+// Logical
+AMPERSAND_AMPERSAND: "&&"
+PIPE_PIPE: "||"
+BANG: "!"
+
+// Bitwise
+AMPERSAND: "&"
+PIPE: "|"
+TILDE: "~"
+CARET: "^"
+LESS_LESS: "<<"
+GREATER_GREATER: ">>"
+
+// Math
+PLUS: "+"
+MINUS: "-"
+STAR: "*"
+STAR_STAR: "**"
+SLASH: "/"
+PERCENT: "%"
+
+// Assignment
+EQUAL: "="
+PLUS_EQUAL: "+="
+MINUS_EQUAL: "-="
+STAR_EQUAL: "*="
+STAR_STAR_EQUAL: "**="
+SLASH_EQUAL: "/="
+PERCENT_EQUAL: "%="
+LESS_LESS_EQUAL: "<<="
+GREATER_GREATER_EQUAL: ">>="
+AMPERSAND_EQUAL: "&="
+PIPE_EQUAL: "|="
+CARET_EQUAL: "^="
+
+// Punctuation
+BRACKET_OPEN: "["
+BRACKET_CLOSE: "]"
+BRACE_OPEN: "{"
+BRACE_CLOSE: "}"
+PARENTHESIS_OPEN: "("
+PARENTHESIS_CLOSE: ")"
+COMMA: ","
+SEMICOLON: ";"
+PERIOD: "."
+PERIOD_PERIOD: ".."
+// Variadic marker in a parameter list (`func f(...args)`). Longer than `..`, so
+// the standard lexer prefers this terminal for `...`.
+PERIOD_PERIOD_PERIOD: "..."
+COLON: ":"
+DOLLAR: "$"
+FORWARD_ARROW: "->"

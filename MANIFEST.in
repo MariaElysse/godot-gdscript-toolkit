@@ -1,2 +1,4 @@
 include gdtoolkit/parser/gdscript.lark
 include gdtoolkit/parser/comments.lark
+include gdtoolkit/gdformat2/parser/gdscript.lark
+include gdtoolkit/gdformat2/parser/comments.lark
