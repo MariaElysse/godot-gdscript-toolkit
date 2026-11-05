@@ -1906,10 +1906,15 @@ def _format_intermediate_expr(node: Tree) -> str:
                 formatted = expression_to_str(child)
                 parts.append(formatted)
     
-    # Join and clean up
-    result = "".join(parts)
-    while "  " in result:
-        result = result.replace("  ", " ")
+    # Join, collapsing only the seam where two padded parts meet. Collapsing every double
+    # space in the whole result - which is what this did - also rewrote the inside of a
+    # string literal: a multiline string's own indentation is literal, and
+    # `r"""a\n  b\n"""` came back with one space per line, changing the value.
+    result = ""
+    for part in parts:
+        if result.endswith(" ") and part.startswith(" "):
+            part = part[1:]
+        result += part
     return result.strip()
 
 
