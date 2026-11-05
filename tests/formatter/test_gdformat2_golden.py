@@ -44,6 +44,12 @@ GDFORMAT2_STYLE_GUIDE_DIVERGENCES: Dict[str, str] = {
     # did not write one for; the style guide requires it.
     "long_array_expressions": "multiline trailing comma",
     "assignment_expressions": "multiline trailing comma",
+    # The guide's documentation comments "must immediately precede" the member they
+    # document, and its own example puts the class doc comment right after `extends` with
+    # no blank before the next member. A doc run is joined to the member it heads; a blank
+    # between the class doc block and a member's own doc block stays. Only a blank line
+    # moves, which is what the canon absorbs.
+    "class_doc_comment_joins_first_member": "doc comment joined to the member it documents",
     # The style guide asks for a space after `{` and before `}` in single-line
     # dictionaries and a trailing comma in multiline ones; the legacy goldens omit both.
     "short_dict_expressions": "single-line dict brace spacing",
@@ -70,6 +76,10 @@ GDFORMAT2_STYLE_GUIDE_DIVERGENCES: Dict[str, str] = {
 # by `test_guide_divergence`, which requires the same program once every change the guide's
 # formatting rules may make is collapsed away.
 GDFORMAT2_GUIDE_DIVERGENCES: Dict[str, str] = {
+    # The goldens write a space after the dot of a wrapped chain segment (`. append(`), which
+    # is legacy's shape; gdformat2 writes `.append(`, since the guide's whitespace rule forbids
+    # the extra space and its own example writes `position.x = 5`.
+    "bug_160_multiline_call_chaining": "no space after the dot in a wrapped chain",
     "long_atom_expressions": (
         "line length: the golden keeps a long `^\"...\"` node path on one 107-column line"
     ),
@@ -359,10 +369,12 @@ def _guide_collapse(text: str) -> str:
     """
     collapsed = "\n".join(_style_guide_canon(text))
     collapsed = re.sub(r"\\[ \t]*\n", "", collapsed)
-    # A chain broken per segment puts its dot at the start of a line and a space after it
-    # (`. name`), where the same chain inline has neither: that is the wrap, not the code. The
-    # pattern needs the newline, so a string's dots are only touched if it spans lines.
-    collapsed = re.sub(r"\n\s*\.\s+", ".", collapsed)
+    # A chain broken per segment puts its dot at the start of a line. The legacy goldens write a
+    # space after that dot (`. name`) and gdformat2 writes none (`.name`, which is what the
+    # guide's whitespace rule asks for), so the space is optional here: it is the wrap, not the
+    # code. The pattern needs the newline, so a string's dots are only touched if it spans
+    # lines, and it takes only blanks after the dot so a line end is never swallowed.
+    collapsed = re.sub(r"\n[ \t]*\.[ \t]*", ".", collapsed)
     collapsed = re.sub(r"[()]", " ", collapsed)
     collapsed = re.sub(r"\s*\bextends\s+" + _EXTENDS_TARGET, "", collapsed)
     collapsed = _NUMERIC_LITERAL.sub(lambda m: m.group(0).replace("_", ""), collapsed)

@@ -1438,6 +1438,8 @@ def _find_orphaned_comment_in_inner_class(inner_class_node: Tree) -> "Tree | Non
     1. It appears as a direct child of an inner_class's class_block
     2. There are no other class_members AFTER it within that block
        (meaning it comes after all real declarations)
+    3. It is indented shallower than the block's own content, so it belongs to the
+       enclosing scope; a comment at the body's column is the class's own and stays
     """
     for gc in getattr(inner_class_node, 'children', []):
         gcsd = _tree_data_str(gc).lower()
@@ -1446,6 +1448,17 @@ def _find_orphaned_comment_in_inner_class(inner_class_node: Tree) -> "Tree | Non
         if not hasattr(gc, 'children') or len(gc.children) == 0:
             continue
         
+        # Column of the block's own content, so a comment written at that column is not
+        # mistaken for one trailing the class at the enclosing scope's column.
+        body_col = None
+        for member in gc.children:
+            msd = _tree_data_str(member).lower()
+            if not hasattr(member, 'data') or "comment" in msd or msd in ("end", "_nl"):
+                continue
+            col = getattr(getattr(member, 'meta', None), 'column', None)
+            if col:
+                body_col = col if body_col is None else min(body_col, col)
+
         # Find all comments inside this class_block (iterate backwards to safely remove)
         for i in range(len(gc.children) - 1, -1, -1):
             gg_child = gc.children[i]
@@ -1462,6 +1475,10 @@ def _find_orphaned_comment_in_inner_class(inner_class_node: Tree) -> "Tree | Non
                     break
             
             if not has_member_after:
+                comment_col = getattr(getattr(gg_child, 'meta', None), 'column', 0)
+                if body_col and comment_col and comment_col >= body_col:
+                    # Indented at the body's column, so it belongs inside this class.
+                    continue
                 # This is an orphaned comment - detach it from inner_class
                 gc.children.pop(i)
                 return gg_child  # Return so caller can add to parent scope

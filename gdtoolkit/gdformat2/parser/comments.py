@@ -38,6 +38,21 @@ BRACKETED_RULES = frozenset({
     "call_suffix",
 })
 
+# Block scopes. A block's span reaches past its last statement onto the line where the
+# dedent is detected, so span containment alone swallowed a trailing comment indented
+# shallower than the block's own body - a comment belonging to the enclosing scope. The
+# next declaration then emitted its blank lines after that comment, which put a blank
+# line between a doc comment and the declaration it documents, and moved the spacing
+# that belongs before the comment to after it.
+#
+# `suite` is deliberately absent. An `if`/`elif`/`else` chain has no container of its own,
+# so a comment written between two branches lives in the preceding branch's suite and the
+# `if` formatter emits it between them; hoisting it would move it past the whole chain.
+# A lambda body is the same: `_format_lambda_multi` renders an expression and has no
+# enclosing scope to hand a comment to. Function suites are also already handled, by the
+# orphan extraction in `_find_suite_or_empty`, which keeps the comment in source order.
+BLOCK_RULES = frozenset({"class_block", "property", "untitled_property"})
+
 
 def _span(node) -> Optional[Tuple[int, int]]:
     if isinstance(node, Token):
@@ -61,8 +76,50 @@ def _comment_node(tok: Token) -> Tree:
     return node
 
 
-def _find_container(tree: Tree, pos: int) -> Tree:
-    """Innermost container enclosing ``pos`` (falls back to ``tree``)."""
+def _is_real_child(child) -> bool:
+    """True for a child that is block content rather than a comment or a marker."""
+    if not isinstance(child, Tree):
+        return False
+    data = str(child.data).lower()
+    return "comment" not in data and data != "end" and not data.startswith("_nl")
+
+
+def _content_column(node) -> int:
+    """Leftmost column of a block's real content, or 0 when it has none."""
+    cols = []
+    for child in getattr(node, "children", []):
+        if not _is_real_child(child):
+            continue
+        col = getattr(getattr(child, "meta", None), "column", None)
+        if isinstance(col, int) and col > 0:
+            cols.append(col)
+    return min(cols) if cols else 0
+
+
+def _trails_shallow_block(node, pos: int, column: int) -> bool:
+    """True when a comment trails `node`'s block from the enclosing scope.
+
+    That is: `node` is a block, the comment is indented shallower than the block's own
+    content, and no real content follows it inside the block. A comment at the body
+    column stays in the block, and so does a shallower one that the block continues past
+    - the indenter ignores comment lines, so a block can hold content after one."""
+    if column <= 0 or str(node.data).lower() not in BLOCK_RULES:
+        return False
+    body = _content_column(node)
+    if not body or column >= body:
+        return False
+    for child in getattr(node, "children", []):
+        sp = _span(child) if _is_real_child(child) else None
+        if sp and sp[0] > pos:
+            return False
+    return True
+
+
+def _find_container(tree: Tree, pos: int, column: int = 0) -> Tree:
+    """Innermost container enclosing ``pos`` (falls back to ``tree``).
+
+    ``column`` is the comment's 1-based source column, which decides whether a block the
+    comment lands in its span is the comment's own scope or the enclosing one."""
     target = tree
     node = tree
     while True:
@@ -70,7 +127,7 @@ def _find_container(tree: Tree, pos: int) -> Tree:
         for child in node.children:
             if isinstance(child, Tree):
                 sp = _span(child)
-                if sp and sp[0] <= pos < sp[1]:
+                if sp and sp[0] <= pos < sp[1] and not _trails_shallow_block(child, pos, column):
                     nxt = child
                     break
         if nxt is None:
@@ -82,7 +139,8 @@ def _find_container(tree: Tree, pos: int) -> Tree:
             # block. Without this the comment was hoisted out of the expression and
             # emitted as a standalone statement next to it.
             for child in node.children:
-                if isinstance(child, Tree) and child.data in CONTAINER_RULES:
+                if (isinstance(child, Tree) and child.data in CONTAINER_RULES
+                        and not _trails_shallow_block(child, pos, column)):
                     return child
             if node.data in BRACKETED_RULES:
                 # An empty collection's only content is the comment and its list child is
@@ -115,6 +173,6 @@ def attach_comments(tree: Tree, comments: List[Token]) -> Tree:
         if tok.start_pos in seen:  # guard against double collection
             continue
         seen.add(tok.start_pos)
-        container = _find_container(tree, tok.start_pos)
+        container = _find_container(tree, tok.start_pos, getattr(tok, "column", 0) or 0)
         _insert_ordered(container, _comment_node(tok), tok.start_pos)
     return tree

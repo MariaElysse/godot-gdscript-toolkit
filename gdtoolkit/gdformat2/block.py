@@ -34,6 +34,28 @@ def _next_real_type(item_types: list, idx: int) -> str:
     return ""
 
 
+def _comment_text_of(item) -> str:
+    node = item[1] if isinstance(item, tuple) else item
+    return _get_comment_text(node)
+
+
+def _ends_with_doc_run(statements, item_types, i) -> bool:
+    """True when the items before `i` end in a `##` doc comment run.
+
+    The guide's documentation comments "must immediately precede a script member", and a
+    doc comment on a class goes right after `extends`/`class_name` and immediately before
+    the first member. So a doc run is joined to the declaration it documents: the blank
+    line an author left between them is dropped, and the declaration's own spacing was
+    emitted before the run instead.
+    """
+    head = None
+    k = i - 1
+    while k >= 0 and item_types[k] == "comment":
+        head = statements[k]
+        k -= 1
+    return head is not None and _comment_text_of(head).startswith("##")
+
+
 def _blank_lines_before_item(
     i, statements, item_types, actual_node, prev_end_line, is_nested, style, deferred=None,
 ):
@@ -93,14 +115,20 @@ def _blank_lines_before_item(
                 break
             run_end_node = statements[j][1] if isinstance(statements[j], tuple) else statements[j]
         after = 0
-        for j in range(i + 1, len(item_types)):
-            if item_types[j] not in _TRANSPARENT:
-                after_node = statements[j][1] if isinstance(statements[j], tuple) else statements[j]
-                if get_line_safe(after_node) - _content_end_line(run_end_node) - 1 >= 1:
-                    after = len(forced_next)
-                break
+        if not _comment_text_of(actual_node).startswith("##"):
+            # A `##` run is a doc comment, which documents the declaration right below it
+            # and so never keeps a blank in between. Any other comment run does keep one
+            # the author wrote, and takes the declaration's spacing with it.
+            for j in range(i + 1, len(item_types)):
+                if item_types[j] not in _TRANSPARENT:
+                    after_node = statements[j][1] if isinstance(statements[j], tuple) else statements[j]
+                    if get_line_safe(after_node) - _content_end_line(run_end_node) - 1 >= 1:
+                        after = len(forced_next)
+                    break
         return [(None, "")] * before, after
 
+    if _ends_with_doc_run(statements, item_types, i):
+        return [], None
     forced = (
         _get_blank_lines(prev_real, next_real, style, prev_end_line, is_nested)
         if next_real else []

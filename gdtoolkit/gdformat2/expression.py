@@ -1045,12 +1045,12 @@ def _format_postfix_multi(
                                                 if val: prefix_content = val
                             break
                 
-                # Build the leading part: either "base[[" (first segment) or ". attr[[]" (subsequent)
+                # Build the leading part: either "base[[" (first segment) or ".attr[[]" (subsequent)
                 # Subscript wraps a nested array_literal, so we need [[
                 if i == 0:
                     leading = f"{inner_indent2}{prefix_content}[["
                 else:
-                    leading = f"{inner_indent2}. {prefix_content}[["
+                    leading = f"{inner_indent2}.{prefix_content}[["
                 result_lines.append((None, leading))
                 
                 # Add all array element lines for each expanding subscript in this segment
@@ -1105,10 +1105,10 @@ def _format_postfix_multi(
                 )
                 if tc_call is not None:
                     # `_etostr` of an attribute carries its leading dot, which the
-                    # `. ` separator below supplies, so drop it.
+                    # `.` separator below supplies, so drop it.
                     name_text = ''.join(_etostr(s) for s in seg if not _is_call_suffix(s))
                     name_text = name_text[1:] if name_text.startswith('.') else name_text
-                    display = f'. {name_text}' if i > 0 else name_text
+                    display = f'.{name_text}' if i > 0 else name_text
                     # The arguments continue the call's own line, so they get the guide's two
                     # levels on top of the segment's indent.
                     arg_indent = continuation_indent(inner_indent2)
@@ -1145,7 +1145,7 @@ def _format_postfix_multi(
                 if i == 0:
                     result_lines.append((None, f"{inner_indent2}{seg_str}"))
                 else:
-                    display_seg = f'. {seg_str}'
+                    display_seg = f'.{seg_str}'
                     result_lines.append((None, f"{inner_indent2}{display_seg}"))
 
         # Append suffix
@@ -1510,7 +1510,7 @@ def _format_postfix_multi(
                     if val: attr_parts.append(val)
         
         prefix_str = ''.join(attr_parts)  # e.g., '. capitalize'
-        indent_line = f"{inner_indent}. {display_seg}"
+        indent_line = f"{inner_indent}.{display_seg}"
         indent_width = len(indent_line.replace('\t', '    '))
         available_space = max_len - len(inner_indent.replace('\t','    '))
         
@@ -1523,7 +1523,7 @@ def _format_postfix_multi(
                 # A long lambda passed as the sole call argument gets its own block
                 # layout; the call's `(` / `)` stay on the segment-indent lines.
                 _call_display = prefix_str[1:] if prefix_str.startswith('.') else prefix_str
-                result_lines.append((None, f"{inner_indent}. {_call_display}("))
+                result_lines.append((None, f"{inner_indent}.{_call_display}("))
                 # The lambda continues the call's own line, so it sits two levels in from the
                 # segment; its body is a block and takes one more from its header.
                 result_lines.extend(_format_lambda_multi(
@@ -1547,7 +1547,7 @@ def _format_postfix_multi(
                 if (after_paren.strip() and ',' in after_paren) and (
                         content_width > available_space or arg_count > 5 or indent_width > max_len):
                     _call_display = prefix_str[1:] if prefix_str.startswith('.') else prefix_str
-                    result_lines.append((None, f"{inner_indent}. {_call_display}("))
+                    result_lines.append((None, f"{inner_indent}.{_call_display}("))
                     # Lay each argument out through the expression formatter. Splitting the
                     # flattened argument string on commas broke any argument that itself
                     # contains one (a dict or a nested call) into pieces.
@@ -1625,7 +1625,7 @@ def _format_postfix_multi(
                 result_lines.append((None, indent_line))
         else:
             # No suffix or suffix too short — just output normally
-            result_lines.append((None, f"{inner_indent}. {display_seg}"))
+            result_lines.append((None, f"{inner_indent}.{display_seg}"))
         
         if close_char and expanded:
             result_lines.append((None, f"{inner_indent}{close_char}"))
