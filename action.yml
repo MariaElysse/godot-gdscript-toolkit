@@ -1,35 +1,31 @@
 name: Godot toolkit install
 author: Pawel Lampe
-description: Install the Godot toolkit
+description: Install the Godot toolkit from the repository source
 branding:
   icon: activity
   color: blue
 
-inputs:
-  version:
-    description: Version of the gdtoolkit to install
-    default: "4.*"
-
 runs:
   using: composite
   steps:
-    - id: create-requirements-if-not-exists
-      run: |
-        if [ ! -f requirements.txt ]; then
-          echo "gdtoolkit==${{inputs.version}}" > requirements.txt
-        fi
-      shell: bash
+    - name: Checkout GDToolkit source
+      uses: actions/checkout@v7
+      with:
+        repository: MariaElysse/godot-gdscript-toolkit
+        path: gdtoolkit-source
 
-    - id: install-python
+    - name: Install Python
       uses: actions/setup-python@v6
       with:
         python-version: "3.x"
         cache: "pip"
 
-    - id: upgrade-setuptools
+    - name: Upgrade setuptools
       run: pip install --upgrade setuptools
       shell: bash
+      working-directory: gdtoolkit-source
 
-    - id: install-gdtoolkit
-      run: pip install gdtoolkit==${{inputs.version}}
+    - name: Install GDToolkit
+      run: pip install .
       shell: bash
+      working-directory: gdtoolkit-source
