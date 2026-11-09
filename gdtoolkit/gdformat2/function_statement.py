@@ -279,7 +279,7 @@ def _format_if_statement(
       [IF_token, expr_tree1, COLON_token, suite_tree1, ELIF_token?, expr_tree2?, ...]
     """
     children = getattr(statement, 'children', [])  # type: ignore
-    formatted_lines: FormattedLines = []  # type: FormattedLines
+    formatted_lines: FormattedLines = []
     i = 0
     
     while i < len(children):
@@ -684,8 +684,8 @@ def _format_branch(
     prefix: str, suffix: str, expr_position: int | None, 
     statement: Tree, indent_string: str, indent_level: int, style=None
 ) -> Outcome:
-    formatted_lines: FormattedLines = []  # type: FormattedLines
-    
+    formatted_lines: FormattedLines = []
+
     if expr_position is not None and len(statement.children) > expr_position:  # type: ignore
         expr = getattr(statement, 'children', [None])[expr_position]  # type: ignore
         if expr is not None:

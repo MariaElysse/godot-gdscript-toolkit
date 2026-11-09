@@ -208,8 +208,8 @@ def format_block(
     Blank lines between statements follow the StyleConfig rules.
     __comment__ tag items are emitted directly without going through statement_formatter.
     """
-    formatted_lines: FormattedLines = []  # type: FormattedLines
-    
+    formatted_lines: FormattedLines = []
+
     if not statements:
         return ([], context_indent_level)
 

@@ -2914,7 +2914,10 @@ def _format_ternary_multi(
         if not sub:
             return [(None, f"{inner_indent}{label}{_ets(node)}")]
         first_line_no, first_text = sub[0]
-        return [(first_line_no, f"{inner_indent}{label}{first_text.lstrip("\t")}")] + sub[1:]
+        # Hoisted out of the f-string: a nested-quote/backslash expression (PEP 701)
+        # would require python 3.12+, breaking 3.11 parse and the pinned black/mypy.
+        stripped_first = first_text.lstrip("\t")
+        return [(first_line_no, f"{inner_indent}{label}{stripped_first}")] + sub[1:]
 
     return (
         [(expression_context.prefix_line, f"{indent_string}{prefix}(")]
