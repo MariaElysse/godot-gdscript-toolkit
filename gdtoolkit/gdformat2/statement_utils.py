@@ -1,5 +1,5 @@
 from ..common.utils import get_line
-from .types import Outcome
+from .types import FormattedLines, Outcome
 
 
 def format_simple_statement(
@@ -10,7 +10,7 @@ def format_simple_statement(
     Returns [(line_number, "statement_name")] tuple.
     Also handles any comment children of the statement node.
     """
-    lines = []
+    lines: FormattedLines = []
     stmt_line = get_line(statement)
     inline_comment = None
 

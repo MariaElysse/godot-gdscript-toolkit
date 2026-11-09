@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Dict, Callable, Any, List, Optional
+from typing import Dict, Callable, Any, List, Optional, Tuple
 
 from lark import Tree, Token
 
@@ -156,7 +156,9 @@ def _format_signal_decl(
             indent_string,
             style,
         )
-    return [(line_no, full_line)]
+    # block.format_block deliberately tolerates a bare line list (falls back to the
+    # previous end line), unlike the declared Outcome.
+    return [(line_no, full_line)]  # type: ignore[return-value]
 
 
 def _display_width(text: str) -> int:
@@ -191,7 +193,7 @@ def _absorb_member_comments(member, siblings) -> None:
     if _tree_data_str(decl).lower() == "enum_decl":
         start = get_line_safe(decl)
 
-        def _matches(ln, _col):
+        def _matches(ln, col):
             return bool(ln) and start <= ln <= end
 
     else:
@@ -413,7 +415,9 @@ def _format_enum_decl(  # noqa: C901
                         c, "column", None
                     )
 
-        open_comments, entry_comments, close_comments = [], {}, []
+        open_comments: List[str] = []
+        entry_comments: Dict[Optional[int], List[str]] = {}
+        close_comments: List[str] = []
         for cline, ccol, ctext in raw_comments:
             if (
                 close_line is not None
@@ -456,7 +460,7 @@ def _format_enum_decl(  # noqa: C901
         # single-line enum, so an enum with entries is never written on one line - only an
         # empty one is - and never with several entries sharing an inner line.
         inner_indent = indent_string + "\t"
-        lines_out = [
+        lines_out: FormattedLines = [
             (get_line(statement), f"{indent_string}{head} {{" + _suffix(open_comments))
         ]
         for idx, ep in enumerate(entry_parts):
@@ -550,7 +554,7 @@ def _format_func_decl(  # noqa: C901
 
     if param_tree is not None:
         params_str = _ets(param_tree)
-        header_lines = [
+        header_lines: FormattedLines = [
             (
                 get_line_safe(statement),
                 f"{indent_string}{prefix}{func_name}{params_str}{suffix_part}",
@@ -808,7 +812,8 @@ def _format_inner_class(  # noqa: C901
                                         )
                                     break
 
-    class_body_stmts = []
+    # (tag, node) pairs, optionally with an inline-comment text as a third element.
+    class_body_stmts: List[Tuple[Any, ...]] = []
     for _, sub_child in enumerate(class_block_children):
         if not hasattr(sub_child, "data"):
             continue
@@ -994,7 +999,7 @@ def _format_bare_string_token(token: Token, indent_string: str) -> Outcome:
 
     if "\n" in result:
         # A multi-line triple-quoted string keeps its own lines.
-        lines = [(None, part) for part in result.split("\n")]
+        lines: FormattedLines = [(None, part) for part in result.split("\n")]
         lines[0] = (line_no, f"{indent_string}{lines[0][1]}")
         return (lines, line_no)
 
@@ -1288,7 +1293,8 @@ def _find_suite_or_empty(  # noqa: C901
                     continue
                 col = getattr(getattr(sub, "meta", None), "column", None)
                 if col:
-                    body_col = col if body_col is None else min(body_col, col)
+                    if body_col is None or col < body_col:
+                        body_col = col
 
             # Second pass: extract items, detecting orphaned comments
             for i, sub_child in enumerate(suite_children):
@@ -1752,7 +1758,8 @@ def _find_orphaned_comment_in_inner_class(inner_class_node: Tree) -> "Tree | Non
                 continue
             col = getattr(getattr(member, "meta", None), "column", None)
             if col:
-                body_col = col if body_col is None else min(body_col, col)
+                if body_col is None or col < body_col:
+                    body_col = col
 
         # Find all comments inside this class_block (iterate backwards to safely remove)
         for i in range(len(gc.children) - 1, -1, -1):

@@ -140,7 +140,8 @@ def _extract_top_level(tree: Tree):  # noqa: C901
     We flatten to a list of: comment nodes, annotations, and actual declarations.
     """
     items = []  # type: List
-    pending_annotations = []  # Collect consecutive annotations before a real statement
+    # Collect consecutive annotations before a real statement
+    pending_annotations: List[Tree] = []
 
     # Move a top-level enum's / annotation's same-line comments out of the file scope so
     # their formatter can attach them positionally.

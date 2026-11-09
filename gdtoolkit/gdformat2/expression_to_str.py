@@ -940,7 +940,7 @@ def _format_subscription_expr(node: Tree) -> str:
     # Fallback: use the direct children of the subscription
     for child in getattr(node, "children", []):
         if isinstance(child, Token) or (
-            isinstance(child, Tree) and hasattr(child.data)
+            isinstance(child, Tree) and hasattr(child, "data")
         ):
             d = str(
                 getattr(

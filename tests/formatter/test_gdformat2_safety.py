@@ -20,6 +20,7 @@ a swapped argument, a flipped comparison and an `and` turned into an `or` are al
 """
 import pathlib
 import sys
+from typing import Dict
 
 import pytest
 
@@ -51,7 +52,8 @@ SKIP = ("bug_326_multistatement_lambda_corner_case.in.gd",)
 # both comment attachment in a property's accessor list, and they went stable once an accessor's
 # trailing comments were emitted in source order and at the scope their column names (see
 # `_format_property` in `var_statement.py`).
-KNOWN_NON_IDEMPOTENT = {}
+# Fixture name -> why it is not yet idempotent, same shape as the divergence maps below.
+KNOWN_NON_IDEMPOTENT: Dict[str, str] = {}
 
 # Pairs `check_tree_invariant` still reports, each because the guide lays the construct out in a
 # shape that re-parses differently rather than because something was lost. An inline accessor

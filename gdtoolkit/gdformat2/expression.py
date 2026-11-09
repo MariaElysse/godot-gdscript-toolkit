@@ -3,7 +3,7 @@
 Adapted from original gdtoolkit/formatter/expression.py to use tree-based
 comment handling instead of line-indexed arrays.
 """
-from typing import List, Optional
+from typing import Any, List, Optional, Tuple
 
 from lark import Tree, Token
 
@@ -15,7 +15,7 @@ from .expression_utils import (
     continuation_indent_for,
 )
 from .style_config import StyleConfig
-from .types import FormattedLines
+from .types import FormattedLine, FormattedLines
 
 
 def _extract_all_tokens(node, names: List[str]) -> None:
@@ -466,7 +466,8 @@ def _is_forced_multiline(expression, style=None) -> bool:  # noqa: C901
                     continue
                 sub_inner = sub_inner[0]
                 # Walk wrappers to find array_literal or paren-wrapped additive expressions
-                inner = sub_inner
+                # Node unwrapping walks Tree/Token/None values, not just lists.
+                inner: Any = sub_inner
                 for _ in range(10):
                     if isinstance(inner, Tree):
                         id2 = str(getattr(inner.data, "value", None)) or str(inner.data)
@@ -721,7 +722,7 @@ def _format_concrete_expression(
     )
 
 
-def _format_token_as_line(token: Token, ec: ExpressionContext, indent) -> tuple:
+def _format_token_as_line(token: Token, ec: ExpressionContext, indent) -> FormattedLine:
     """Format a single token as a line."""
     prefix = (
         f"{ec.prefix_string}{token.value}"
@@ -829,7 +830,7 @@ def _call_has_block_lambda_argument(call_suffix) -> bool:
 
 
 def _block_argument_lines(
-    arg_nodes, first_line_no: int, inner_indent: str, style
+    arg_nodes, first_line_no: Optional[int], inner_indent: str, style
 ) -> FormattedLines:
     """Lay a comma-separated argument/element list out one block per item.
 
@@ -2680,16 +2681,18 @@ def _format_foldable_to_multiple_lines(  # noqa: C901
             expression_context.suffix_string,  # type: ignore
             expression_context.suffix_line,
         )
-        return [
-            (
-                _format_standalone_expression(
-                    expression.children[0],
-                    new_ec,
-                    indent_string,
-                    style or StyleConfig(),
-                )
+        # The element is a whole FormattedLines list, not a FormattedLine tuple. The
+        # nested shape is preserved as-is (callers of this path expect it); the list
+        # is therefore annotated more loosely than FormattedLines.
+        nested_lines: List[Any] = [
+            _format_standalone_expression(
+                expression.children[0],
+                new_ec,
+                indent_string,
+                style or StyleConfig(),
             )
         ]
+        return nested_lines
 
     handler = handlers_map.get(data)
     if handler is None:
@@ -2732,11 +2735,13 @@ def _format_foldable_to_multiple_lines(  # noqa: C901
             if hasattr(expression, "children") and expression.children
             else expression  # type: ignore
         )
-        return [
+        # Nested FormattedLines inside the list - same loose annotation as above.
+        nested_lines = [
             _format_standalone_expression(
                 first_child, result, indent_string, style or StyleConfig()
             )
         ]
+        return nested_lines
     return result
 
 
@@ -2859,7 +2864,7 @@ def _format_unary_chain_multi(  # noqa: C901
                 return _format_postfix_multi(
                     unwrapped_inner,
                     ExpressionContext(
-                        new_prefix, expression_context.prefix_line, "", ""
+                        new_prefix, expression_context.prefix_line, "", None
                     ),
                     indent_string,
                     style or StyleConfig(),
@@ -3619,7 +3624,7 @@ def _format_dict_multi(  # noqa: C901
     # rendering one as an entry produced output like `{ # q, "x": 1 }`.
     layout = _collection_layout(dict_tree)
     has_comments = any(kind == "comment" for kind, _n, _c in layout)
-    ordered = []
+    ordered: List[Tuple[Any, ...]] = []
     for kind, node, had_comma in layout:
         if kind == "comment":
             ordered.append(("comment", node))
@@ -4079,7 +4084,9 @@ def _format_operator_chain_multi(
         "EQUAL_EQUAL",
         "BANG_EQUAL",
     }
-    parts = []
+    # Triples of (kind, inline text, node): the node is None for operator entries and a
+    # Token or Tree for operand entries, so the columns stay open.
+    parts: List[Tuple[str, Any, Any]] = []
     for child in non_none:
         if isinstance(child, Token):
             ttype = str(getattr(child, "type", "")).upper()
@@ -4144,7 +4151,9 @@ def _format_operator_chain_multi(
 
     # If the inner content fits, use: (\ncompact) format
     if inner_content_width <= max_len and not any_operand_forced:
-        result_lines = [(first_line_no, f"{indent_string}{prefix_text}(")]
+        result_lines: FormattedLines = [
+            (first_line_no, f"{indent_string}{prefix_text}(")
+        ]
         result_lines.append((None, f"{inner_indent}{compact_display}"))
         result_lines.append((None, f"{indent_string}){suffix_text}"))
         return result_lines
@@ -4154,7 +4163,7 @@ def _format_operator_chain_multi(
     # operand per line is short, so this branch gets the full two levels even when the
     # compact form above had to settle for one.
     inner_indent = continuation_indent(indent_string)
-    result_lines: FormattedLines = [(first_line_no, f"{indent_string}{prefix_text}(")]
+    result_lines = [(first_line_no, f"{indent_string}{prefix_text}(")]
     for i, (op, _text, node) in enumerate(items):
         sub = _format_concrete_expression(
             node,

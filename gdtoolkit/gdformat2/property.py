@@ -3,6 +3,8 @@
 Handles inline property accessors (get = __set, get: ... , set(x): ...)
 in variable declarations.
 """
+from typing import List
+
 from lark import Tree, Token
 
 from ..common.utils import get_line
@@ -35,7 +37,7 @@ def append_property_body_to_formatted_line(
 
     Returns (new_lines_list, end_line_number).
     """
-    lines = [line_text]  # type: FormattedLines
+    lines: List[str] = [line_text]
     for child in getattr(inline_prop, "children", []):
         if hasattr(child, "data"):
             handler = _get_property_handler(str(child.data))  # type: ignore
@@ -96,7 +98,7 @@ def _format_property_getter(
     prop: Tree, indent_string: str, indent_level: int, style=None
 ) -> tuple:
     """Format a custom getter block."""
-    lines = [(get_line(prop), f"{indent_string}get():")]
+    lines: FormattedLines = [(get_line(prop), f"{indent_string}get():")]
     # Format body statements (after the `get:` header)
     for child in getattr(prop, "children", []):
         if hasattr(child, "data"):
@@ -115,7 +117,7 @@ def _format_property_setter(
         if isinstance(child, Token):
             arg_name = str(child.value)  # type: ignore
 
-    lines = [(get_line(prop), f"{indent_string}set({arg_name}):")]
+    lines: FormattedLines = [(get_line(prop), f"{indent_string}set({arg_name}):")]
     for child in getattr(prop, "children", []):
         if hasattr(child, "data"):
             data_str = str(child.data).lower()  # type: ignore

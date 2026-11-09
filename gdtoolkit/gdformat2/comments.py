@@ -38,10 +38,12 @@ def _find_all_comments(tree: Tree) -> List[Tree]:
     comments = []
     for child in getattr(tree, "children", []):
         if isinstance(child, Tree):
+            # lark's `Tree.data` is a plain str, so the `.value` branch is
+            # defensive dead code - guarded by `hasattr`, never taken at runtime.
             data = (
                 str(child.data)
                 if not hasattr(child.data, "value")
-                else child.data.value
+                else child.data.value  # type: ignore[attr-defined]
             )  # type: ignore
             if data == "comment":
                 comments.append(child)

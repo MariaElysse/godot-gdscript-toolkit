@@ -1,3 +1,5 @@
+from typing import cast
+
 from lark import Tree, Token
 
 from ..common.utils import get_line, get_end_line
@@ -103,9 +105,10 @@ def _format_const_statement(  # noqa: C901
     if expr_node is not None:
         from .expression_utils import strip_slot_parentheses
 
-        expr_node = strip_slot_parentheses(
-            expr_node, const_prefix, indent_string, style
-        )
+        # `strip_slot_parentheses` is annotated `-> object` but returns the
+        # (possibly rebuilt) Tree chain it was given.
+        stripped = strip_slot_parentheses(expr_node, const_prefix, indent_string, style)
+        expr_node = cast(Tree, stripped)
 
     # Format the expression value (skip through assignment/cast wrappers)
     from .expression_to_str import expression_to_str as ets

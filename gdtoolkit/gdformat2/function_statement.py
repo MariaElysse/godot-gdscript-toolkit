@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Dict, Callable, Any, List
+from typing import Dict, Callable, Any, List, Tuple, cast
 
 from lark import Tree, Token
 
@@ -58,7 +58,7 @@ def _format_assert_statement(
     ):
         from .expression import _block_argument_lines
 
-        lines = [(get_line_safe(statement), f"{indent_string}assert(")]
+        lines: FormattedLines = [(get_line_safe(statement), f"{indent_string}assert(")]
         lines.extend(
             _block_argument_lines(
                 arg_nodes,
@@ -289,7 +289,9 @@ def _format_return_statement(
         # `return (a or b)` -> `return a or b`.
         from .expression_utils import strip_wrapped_outer_parentheses as _strip
 
-        expr_node = _strip(expr_node)
+        # `strip_wrapped_outer_parentheses` is annotated `-> object` but returns
+        # the (possibly rebuilt) Tree chain it was given.
+        expr_node = cast(Tree, _strip(expr_node))
         expression_context = ExpressionContext(
             "return ", get_line_safe(statement), "", get_end_line_safe(statement)
         )
@@ -459,7 +461,7 @@ def _format_else_header(
         if hasattr(child, "data") and _tree_data_str(child).lower() == "suite":
             body_stmts = _extract_suite_body(child)
             line_no = get_line_safe(children[keyword_pos])
-            header_lines = [(line_no, f"{indent_string}else:")]
+            header_lines: FormattedLines = [(line_no, f"{indent_string}else:")]
 
             if body_stmts:
                 body_indent_string = _get_body_indent(style, indent_level)
@@ -529,7 +531,8 @@ def _extract_suite_body(suite_tree) -> list:  # noqa: C901
                             comment_text = _get_comment_text(child)
                             inline_comments[comment_line_no] = comment_text
 
-    stmts = []
+    # Members are 2-tuples (tag, node); members with an inline comment are 3-tuples.
+    stmts: List[Tuple[Any, ...]] = []
     for child in getattr(suite_tree, "children", []):
         if child is None:
             continue
@@ -685,7 +688,7 @@ def _format_match_statement(
 
     # Extract expression at position 1
     expr_pos = 1
-    header_lines: List[tuple] = []
+    header_lines: FormattedLines = []
     if expr_pos < len(children):
         expr_tree = children[expr_pos]
         if isinstance(expr_tree, Tree) and hasattr(expr_tree, "data"):

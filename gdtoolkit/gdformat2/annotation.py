@@ -1,8 +1,10 @@
 """Format a GDScript decorator annotation expression."""
+from typing import Any, Dict, List, Tuple, Union
+
 from lark import Tree, Token
 
 from ..common.utils import get_line, get_end_line
-from .types import Outcome
+from .types import FormattedLines, Outcome
 
 
 def format_annotation(  # noqa: C901
@@ -111,7 +113,10 @@ def format_annotation(  # noqa: C901
         _gather(args_tree)
     all_comments.sort()
 
-    open_comments, close_comments, arg_comments, stray = [], [], {}, []
+    open_comments, close_comments, stray = [], [], []
+    # Keys are source line numbers, but lookups pass `arg_line` which can be
+    # None; `Any` keeps both the sorted() and the .get() call sites honest.
+    arg_comments: Dict[Any, List[str]] = {}
     for cln, ccol, ctxt in all_comments:
         if (
             close_line is not None
@@ -169,7 +174,7 @@ def format_annotation(  # noqa: C901
         indent_string, len(joined), max_len, style.tab_size if style else 4
     )
     inner_width = len(inner_indent.replace("\t", "    "))
-    lines = [(line_num, f"{indent_string}{name}(")]
+    lines: FormattedLines = [(line_num, f"{indent_string}{name}(")]
     if args_list and inner_width + len(joined) <= max_len:
         # The joined arguments still fit on one continuation line; the opening and
         # argument comments join it - unless the comment is what pushes the line over,
@@ -217,7 +222,7 @@ def _format_annotation_args_with_inline(args_tree: Tree):
     Returns (formatted_args_string, list_of_inline_comment_texts).
     """
     # Extract actual expression children (skip commas and placeholders)
-    expr_children = []
+    expr_children: List[Union[Tuple[str, str], Tree]] = []
     for child in getattr(args_tree, "children", []):
         if not isinstance(child, Tree):
             continue
@@ -259,8 +264,11 @@ def _get_comment_text(comment_node: Tree) -> str:
 def _tree_data_str(node) -> str:
     """Return a tree's rule name as a plain string."""
     if isinstance(node, Tree):
+        # The lark stubs type `Tree.data` as plain str, but at runtime it can
+        # be a Token-like object with a `.value`; the hasattr guard picks the
+        # right branch, which mypy cannot see.
         d = node.data
-        return str(d) if not hasattr(d, "value") else d.value
+        return str(d) if not hasattr(d, "value") else d.value  # type: ignore[attr-defined]
     return ""
 
 

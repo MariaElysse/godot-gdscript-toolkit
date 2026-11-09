@@ -6,6 +6,7 @@ Comments are collected by the postlexer and attached into the tree at their
 correct positions via :py:func:`attach_comments`.
 """
 import os
+from typing import Any, Dict
 
 from lark import Lark, Tree
 
@@ -80,7 +81,7 @@ class Parser:
 
         # Earley doesn't support caching — skip cache dir entirely
         # Match GDScriptParser pattern exactly for lexer/callback setup
-        options = {
+        options: Dict[str, Any] = {
             "parser": "earley",
             "ambiguity": "resolve",
             "propagate_positions": True,
@@ -117,7 +118,9 @@ def _rule_name(node) -> str:
     if not isinstance(node, Tree):
         return ""
     data = node.data
-    return str(data) if not hasattr(data, "value") else data.value
+    # lark's `Tree.data` is a plain str, so the `.value` branch is defensive
+    # dead code - guarded by `hasattr`, never taken at runtime.
+    return str(data) if not hasattr(data, "value") else data.value  # type: ignore[attr-defined]
 
 
 def _start_line(node) -> int:

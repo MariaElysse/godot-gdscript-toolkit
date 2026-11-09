@@ -39,7 +39,7 @@ import re
 import sys
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from lark import Token, Tree
 
@@ -96,7 +96,8 @@ _KEYWORDS = frozenset(
     """.split()
 )
 
-DEFAULT_CONFIG = MappingProxyType(
+# Values are heterogeneous (ints, lists of names), hence Any; quoted for py<3.9 safety.
+DEFAULT_CONFIG: "MappingProxyType[str, Any]" = MappingProxyType(
     {
         # check control
         "disable": [],

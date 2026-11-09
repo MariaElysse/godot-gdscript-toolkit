@@ -3,7 +3,7 @@ from lark import Tree, Token
 from .context import ExpressionContext
 from .expression_utils import continuation_indent_for
 from .style_config import StyleConfig
-from .types import Outcome
+from .types import FormattedLines, Outcome
 from .expression import format_expression
 from .statement_utils import format_simple_statement
 
@@ -549,7 +549,7 @@ def _format_var_property(
     from .expression import _comment_layout_text, _node_end_line, _node_line
 
     container = prop if prop is not None else statement
-    lines = [
+    lines: FormattedLines = [
         (
             get_line_safe(statement),
             f"{indent_string}{_var_declaration_head(statement, prefix)}:",

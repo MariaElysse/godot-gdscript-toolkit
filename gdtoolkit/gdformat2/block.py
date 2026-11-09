@@ -318,7 +318,7 @@ def format_block(  # noqa: C901
         # declaration is about to receive pending annotations, its spacing was
         # already emitted at the head of the annotation run.
         if pending_annotations:
-            blank_lines = []
+            blank_lines: FormattedLines = []
             deferred = None
         elif i > 0 and item_types[i - 1] == "annotation":
             # The item before this one is a *standalone* annotation (a prependable run would
@@ -370,7 +370,7 @@ def format_block(  # noqa: C901
             )
 
             # Ensure we get a proper tuple back
-            lines = []
+            lines: FormattedLines = []
             last_processed_line_no = prev_end_line
 
             if isinstance(result, list):
@@ -501,6 +501,7 @@ def _get_blank_lines(
     - Comments inside nested scopes follow their position in source order
     """
     forced_blanks = 0
+    empty_line: FormattedLines = [(None, "")]
 
     # Top-level declaration types at file level
     TOP_LEVEL_TYPES = {
@@ -529,7 +530,7 @@ def _get_blank_lines(
         and prev_name not in ("", "comment")
         and (prev_name in definition_types or next_name in definition_types)
     ):
-        return 2 * [(None, "")]
+        return 2 * empty_line
 
     # Nested (inside a function/class) definitions get one blank line around them. This
     # must precede the same-type/identical-kind rules, which would otherwise collapse a
