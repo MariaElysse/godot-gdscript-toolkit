@@ -1007,9 +1007,7 @@ def format_match_branch_statement(
         return (formatted_lines, get_end_line_safe(actual_stmt))
     else:
         # Could be a nested statement inside the match suite
-        from .function_statement import format_func_statement as _fmt_func
-
-        return _fmt_func(statement, indent_string, indent_level, style)
+        return format_func_statement(statement, indent_string, indent_level, style)
 
 
 def _layout_match_line(node, prefix, suffix, line_no, indent_string, style):

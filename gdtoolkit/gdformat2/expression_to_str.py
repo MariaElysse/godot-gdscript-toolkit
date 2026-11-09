@@ -712,12 +712,8 @@ def _lambda_to_str(a_lambda: Tree) -> str:
         if isinstance(child, Tree):
             d = str(getattr(child.data, "value", str(child.data)))
             if d == "return_type":
-                from .expression_to_str import (
-                    expression_to_str as ets,
-                )  # avoid circular
-
                 has_return_type = True
-                return_type_str = f" -> {ets(child)}"
+                return_type_str = f" -> {expression_to_str(child)}"
                 break
 
     num_params = len(param_names)
@@ -1041,11 +1037,7 @@ def _param_to_str(param: Tree) -> str:
                     next_child = children_list[j]
                     if isinstance(next_child, Tree):
                         try:
-                            from .expression_to_str import (
-                                standalone_expression_to_str as sats,
-                            )
-
-                            default_val = sats(next_child)
+                            default_val = standalone_expression_to_str(next_child)
                         except Exception:
                             pass
                         break
@@ -1214,7 +1206,6 @@ def _suite_to_inline_str(suite: Tree) -> str:
     For single statements, returns the formatted statement directly.
     For multiple statements, joins them with semicolons (inline format).
     """
-    from .expression_to_str import expression_to_str
     from ..formatter.function_statement_to_str import function_statement_to_str as _fsts
 
     # Find actual statement children (skip NL/indent/dedent tokens)

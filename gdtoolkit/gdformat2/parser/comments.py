@@ -14,7 +14,6 @@ CONTAINER_RULES = frozenset(
         "class_block",
         "suite",
         "match_stmt",
-        "property",
         "arguments",
         "elements",
         "dict_entries",
@@ -111,8 +110,10 @@ def _trails_shallow_block(node, pos: int, column: int) -> bool:
     if not body or column >= body:
         return False
     for child in getattr(node, "children", []):
-        sp = _span(child) if _is_real_child(child) else None
-        if sp and sp[0] > pos:
+        if not _is_real_child(child):
+            continue
+        sp = _span(child)
+        if sp is not None and sp[0] > pos:
             return False
     return True
 

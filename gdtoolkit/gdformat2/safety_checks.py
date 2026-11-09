@@ -2,7 +2,7 @@
 
 Three validation layers after formatting:
 1. Tree invariant — formatted output re-parses to structurally equivalent AST
-2. Formatting stability — double-formatting produces identical output (idempotency)  
+2. Formatting stability — double-formatting produces identical output (idempotency)
 3. Comment persistence — all comments preserved in formatted output
 """
 import difflib

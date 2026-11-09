@@ -2546,8 +2546,6 @@ def _format_foldable_to_multiple_lines(
                         inner_expr_to_use, new_ec, indent_string, style
                     )
                 elif d in ("postfix",):
-                    from .expression import _format_postfix_multi
-
                     new_ec = ExpressionContext(
                         f"{expression_context.prefix_string}{op_prefix}",
                         expression_context.prefix_line,
@@ -2812,8 +2810,6 @@ def _format_unary_chain_multi(
             # Delegate to the appropriate multiline handler with unary prefix + parens
             new_prefix = f"{expression_context.prefix_string}{op_prefix}"
             if d == "postfix":
-                from .expression import _format_postfix_multi
-
                 return _format_postfix_multi(
                     unwrapped_inner,
                     ExpressionContext(

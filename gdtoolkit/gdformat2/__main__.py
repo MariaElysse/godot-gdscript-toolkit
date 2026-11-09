@@ -264,19 +264,12 @@ def _format_code(
         if formatted_code != code:
             actually_formatted = True
             if safety_enabled:
-                try:
-                    check_all_safety(
-                        original_code=code,
-                        original_tree=parse_tree,
-                        formatted_code=formatted_code,
-                        style=style,
-                    )
-                except (
-                    TreeInvariantViolation,
-                    FormattingStabilityViolation,
-                    CommentPersistenceViolation,
-                ):
-                    raise
+                check_all_safety(
+                    original_code=code,
+                    original_tree=parse_tree,
+                    formatted_code=formatted_code,
+                    style=style,
+                )
     except lark.exceptions.UnexpectedToken as e:
         success = False
         print(
