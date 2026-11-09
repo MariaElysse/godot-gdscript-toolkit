@@ -2,6 +2,7 @@ import re
 
 import pytest
 import hypothesis.extra.lark
+import hypothesis.strategies as st
 from hypothesis import settings, given, HealthCheck
 from lark import Lark
 
@@ -26,13 +27,29 @@ with open("gdtoolkit/parser/gdscript.lark", "r", encoding="utf-8") as handle:
         flags=re.MULTILINE,
     )
     print(simplified_gdscript_grammar)
-    for keyword in ["as", "not", "await", "and", "else", "if", "or", "in"]:
+    for keyword in ["as", "is not", "is", "not", "await", "and", "else", "if", "or", "in"]:
         simplified_gdscript_grammar = simplified_gdscript_grammar.replace(
             f'"{keyword}"', f'" {keyword} "'
         )
-    simplified_gdscript_grammar = simplified_gdscript_grammar.replace("TYPE:", "XTYPE:")
+    # lambdas may generate _NL/_INDENT suites containing real newlines, while
+    # this harness embeds the whole expression into a single-line
+    # "func foo(): <expr>" body, so drop lambdas from generated expressions
     simplified_gdscript_grammar = simplified_gdscript_grammar.replace(
-        "%ignore WS_INLINE", 'TYPE: " " XTYPE " "'
+        "     | lambda\n", ""
+    )
+    simplified_gdscript_grammar = simplified_gdscript_grammar.replace("TYPE:", "XTYPE:")
+    # NB: glue the type with a *leading* space only. A trailing space would
+    # emit `A [ A ]`, which the real lexer cannot match as the TYPE_HINT
+    # terminal (it only accepts `A[A]`/`A [A]`-style single spaces inside).
+    simplified_gdscript_grammar = simplified_gdscript_grammar.replace(
+        "%ignore WS_INLINE", 'TYPE: " " XTYPE'
+    )
+    # The real TYPE_HINT terminal allows no space after '[' or around the
+    # inner types, so nest bare XTYPEs there; only the outer TYPE keeps the
+    # token-separating leading space (the real lexer ignores it anyway).
+    simplified_gdscript_grammar = simplified_gdscript_grammar.replace(
+        'TYPE_HINT: TYPE ["[" TYPE [[" "] "," [" "] TYPE] "]"]',
+        'TYPE_HINT: TYPE ["[" XTYPE [[" "] "," [" "] XTYPE] "]"]',
     )
     simplified_gdscript_grammar = simplified_gdscript_grammar.replace(
         "%ignore COMMENT", ""
@@ -51,7 +68,13 @@ def format_and_check_safety(input_code):
     suppress_health_check=(HealthCheck.filter_too_much, HealthCheck.too_slow),
     max_examples=500,
 )
-@given(hypothesis.extra.lark.from_lark(gdscript_lark, start="expr"))  # type: ignore
+@given(
+    hypothesis.extra.lark.from_lark(
+        gdscript_lark,
+        start="expr",
+        explicit={"_INDENT": st.just("\n\t"), "_DEDENT": st.just("")},
+    )
+)  # type: ignore
 def test_expression_parsing(expression):
     print(expression)
     gdscript_code = "func foo():{}\n".format(expression)
@@ -64,7 +87,13 @@ def test_expression_parsing(expression):
     suppress_health_check=(HealthCheck.filter_too_much, HealthCheck.too_slow),
     max_examples=500,
 )
-@given(hypothesis.extra.lark.from_lark(gdscript_lark, start="expr"))  # type: ignore
+@given(
+    hypothesis.extra.lark.from_lark(
+        gdscript_lark,
+        start="expr",
+        explicit={"_INDENT": st.just("\n\t"), "_DEDENT": st.just("")},
+    )
+)  # type: ignore
 def test_expression_formatting(expression):
     print(expression)
     gdscript_code = "func foo():{}\n".format(expression)
