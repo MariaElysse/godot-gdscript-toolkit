@@ -11,16 +11,17 @@ def format_const_statement(
     statement: Tree, indent_string: str, indent_level: int, style=None
 ) -> Outcome:
     """Format a constant declaration.
-    
+
     New grammar structure (flat):
         constant_decl [CONST_token, NAME, COLON, EQUAL?, assignment_tree?]
     """
     stmt_data = _tree_data_str(statement)
-    children_list = list(getattr(statement, 'children', []))
+    children_list = list(getattr(statement, "children", []))
 
     # Emit standalone comment children first
-    for child in getattr(statement, 'children', []):
+    for child in getattr(statement, "children", []):
         from lark import Tree as LarkTree
+
         if isinstance(child, LarkTree) and _tree_data_str(child) == "comment":
             comment_text = _get_comment_text(child)
             return ([(get_line(child), f"{indent_string}{comment_text}")], get_end_line(statement))  # type: ignore
@@ -38,7 +39,7 @@ def _format_const_statement(
     statement: Tree, children_list, indent_string: str, indent_level: int, style=None
 ) -> Outcome:
     """Format a constant declaration for the new flat grammar.
-    
+
     Structure: [CONST_token('const'), NAME('C'), COLON(':'), EQUAL('=')?, assignment_tree]
     Or inference:  [CONST_token, NAME, COLON, EQUAL(=)] with type being None
     """
@@ -46,35 +47,43 @@ def _format_const_statement(
     type_node = None
     expr_node = None
     has_colon_equal = False  # : = means := (inference)
-    
+
     for i, c in enumerate(children_list):
         if c is None:
             continue
-        if isinstance(c, Token) and str(getattr(c, 'type', '')).lower() == 'name':
-            name = str(getattr(c, 'value', '?'))
-        elif isinstance(c, Token) and str(getattr(c, 'type', '')).lower() in ('colon',):
+        if isinstance(c, Token) and str(getattr(c, "type", "")).lower() == "name":
+            name = str(getattr(c, "value", "?"))
+        elif isinstance(c, Token) and str(getattr(c, "type", "")).lower() in ("colon",):
             # Check if next child is EQUAL (meaning : = or :=)
             next_idx = i + 1
             if next_idx < len(children_list) and children_list[next_idx] is not None:
                 nc = children_list[next_idx]
-                if isinstance(nc, Token) and str(getattr(nc, 'type', '')).lower() == 'equal':
+                if (
+                    isinstance(nc, Token)
+                    and str(getattr(nc, "type", "")).lower() == "equal"
+                ):
                     has_colon_equal = True
-        elif isinstance(c, Token) and str(getattr(c, 'type', '')).lower() == 'equal' and not has_colon_equal:
+        elif (
+            isinstance(c, Token)
+            and str(getattr(c, "type", "")).lower() == "equal"
+            and not has_colon_equal
+        ):
             pass  # already handled by colon check above
         elif isinstance(c, Tree):
-            d = str(getattr(getattr(c, 'data', None), 'value', getattr(c, 'data', '')))
-            if d == 'type' and type_node is None:
+            d = str(getattr(getattr(c, "data", None), "value", getattr(c, "data", "")))
+            if d == "type" and type_node is None:
                 type_node = c
-            elif d in ('assignment',) and expr_node is None:
+            elif d in ("assignment",) and expr_node is None:
                 expr_node = c
-    
+
     # Build type hint string using our improved method
     if type_node is not None and not has_colon_equal:
         try:
             from .var_statement import _safe_str
+
             type_hint = _safe_str(type_node)
         except Exception:
-            type_hint = str(getattr(type_node, 'data', '?'))
+            type_hint = str(getattr(type_node, "data", "?"))
     else:
         type_hint = ""
 
@@ -92,10 +101,14 @@ def _format_const_statement(
     # An operand's own group (`(1 + 2) * 3`) stays.
     if expr_node is not None:
         from .expression_utils import strip_slot_parentheses
-        expr_node = strip_slot_parentheses(expr_node, const_prefix, indent_string, style)
+
+        expr_node = strip_slot_parentheses(
+            expr_node, const_prefix, indent_string, style
+        )
 
     # Format the expression value (skip through assignment/cast wrappers)
     from .expression_to_str import expression_to_str as ets
+
     try:
         if expr_node is not None:
             expr_str = ets(expr_node)
@@ -112,7 +125,10 @@ def _format_const_statement(
     elif type_hint and expr_str != "?":
         prefix = f"const {name}: {type_hint} = "
     elif type_hint:
-        return ([(get_line(statement), f"{indent_string}const {name}: {type_hint}")], get_end_line_safe(statement))
+        return (
+            [(get_line(statement), f"{indent_string}const {name}: {type_hint}")],
+            get_end_line_safe(statement),
+        )
     else:
         prefix = f"const {name} = "
 
@@ -121,26 +137,34 @@ def _format_const_statement(
     # array, dict, call or preload) instead of one flattened line.
     max_len = style.line_length if style else 100
     from .expression import _is_forced_multiline
+
     if expr_node is not None and (
         _is_forced_multiline(expr_node, style)
-        or len(f"{indent_string}{prefix}{expr_str}".replace('\t', '    ')) > max_len
+        or len(f"{indent_string}{prefix}{expr_str}".replace("\t", "    ")) > max_len
     ):
         lines, end_line = format_expression(
             expr_node,
-            ExpressionContext(prefix, get_line(statement), "", get_end_line_safe(statement)),
-            indent_string, style,
+            ExpressionContext(
+                prefix, get_line(statement), "", get_end_line_safe(statement)
+            ),
+            indent_string,
+            style,
         )
         return (lines, end_line)
 
-    return ([(get_line(statement), f"{indent_string}{prefix}{expr_str}")], get_end_line_safe(statement))
+    return (
+        [(get_line(statement), f"{indent_string}{prefix}{expr_str}")],
+        get_end_line_safe(statement),
+    )
 
 
 def _tree_data_str(node):
     """Return a tree's rule name as a plain string."""
     from lark import Tree
+
     if isinstance(node, Tree):
         d = node.data
-        return d.value if hasattr(d, 'value') else str(d)
+        return d.value if hasattr(d, "value") else str(d)
     return ""
 
 
@@ -148,6 +172,7 @@ def _get_comment_text(comment_node) -> str:
     """Extract the text content from a comment tree node."""
     from lark import Tree
     from .comments import normalize_comment
+
     if not isinstance(comment_node, Tree):
         return ""
     for child in comment_node.children:

@@ -129,6 +129,6 @@ def test_comment_persistence(input_code: str, expected_output_code: str):
     re_parsed = p.parse(formatted_code)
     re_parsed_comments = collect_comments_from_tree(re_parsed)
 
-    assert set(original_comments) == set(re_parsed_comments), (
-        f"Comments not preserved.\nOriginal: {original_comments}\nAfter format: {re_parsed_comments}"
-    )
+    assert set(original_comments) == set(
+        re_parsed_comments
+    ), f"Comments not preserved.\nOriginal: {original_comments}\nAfter format: {re_parsed_comments}"

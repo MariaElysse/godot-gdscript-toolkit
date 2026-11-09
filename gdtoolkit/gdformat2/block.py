@@ -57,7 +57,14 @@ def _ends_with_doc_run(statements, item_types, i) -> bool:
 
 
 def _blank_lines_before_item(
-    i, statements, item_types, actual_node, prev_end_line, is_nested, style, deferred=None,
+    i,
+    statements,
+    item_types,
+    actual_node,
+    prev_end_line,
+    is_nested,
+    style,
+    deferred=None,
 ):
     """Blank lines to emit before item `i`, plus any count carried to the next item.
 
@@ -83,7 +90,8 @@ def _blank_lines_before_item(
             # forced by the previous statement applies to it.
             forced_prev = (
                 _get_blank_lines(prev_real, prev_real, style, prev_end_line, is_nested)
-                if prev_real else []
+                if prev_real
+                else []
             )
             before = max(len(forced_prev), 1 if gap >= 1 else 0)
             return [(None, "")] * before, deferred
@@ -96,9 +104,12 @@ def _blank_lines_before_item(
         # wrote in front of the run pulls that declaration's spacing in front too.
         forced_prev = (
             _get_blank_lines(prev_real, prev_real, style, prev_end_line, is_nested)
-            if prev_real else []
+            if prev_real
+            else []
         )
-        forced_next = _get_blank_lines(next_real, next_real, style, prev_end_line, is_nested)
+        forced_next = _get_blank_lines(
+            next_real, next_real, style, prev_end_line, is_nested
+        )
         before = max(
             len(forced_prev),
             len(forced_next) if gap >= 1 else 0,
@@ -113,7 +124,9 @@ def _blank_lines_before_item(
         for j in range(i + 1, len(item_types)):
             if item_types[j] not in _TRANSPARENT:
                 break
-            run_end_node = statements[j][1] if isinstance(statements[j], tuple) else statements[j]
+            run_end_node = (
+                statements[j][1] if isinstance(statements[j], tuple) else statements[j]
+            )
         after = 0
         if not _comment_text_of(actual_node).startswith("##"):
             # A `##` run is a doc comment, which documents the declaration right below it
@@ -121,8 +134,15 @@ def _blank_lines_before_item(
             # the author wrote, and takes the declaration's spacing with it.
             for j in range(i + 1, len(item_types)):
                 if item_types[j] not in _TRANSPARENT:
-                    after_node = statements[j][1] if isinstance(statements[j], tuple) else statements[j]
-                    if get_line_safe(after_node) - _content_end_line(run_end_node) - 1 >= 1:
+                    after_node = (
+                        statements[j][1]
+                        if isinstance(statements[j], tuple)
+                        else statements[j]
+                    )
+                    if (
+                        get_line_safe(after_node) - _content_end_line(run_end_node) - 1
+                        >= 1
+                    ):
                         after = len(forced_next)
                     break
         return [(None, "")] * before, after
@@ -131,7 +151,8 @@ def _blank_lines_before_item(
         return [], None
     forced = (
         _get_blank_lines(prev_real, next_real, style, prev_end_line, is_nested)
-        if next_real else []
+        if next_real
+        else []
     )
     source_blanks = 1 if gap >= 1 else 0
     if deferred is not None:
@@ -148,6 +169,7 @@ def _render_annotations_standalone(annotations, indent_string, indent_level, sty
     comment on the annotation's source line rides along on its first line.
     """
     from .annotation import format_annotation
+
     out: list = []
     for ann, text in annotations:
         ann_lines, _ = format_annotation(ann, indent_string, indent_level, style)
@@ -172,26 +194,32 @@ def _join_annotations(clean_lines, annotations, style, indent_string, indent_lev
     first = clean_lines[0]
     target_text = first[1]
     stripped = target_text.strip()
-    indent_prefix = target_text[:len(target_text) - len(target_text.lstrip())]
+    indent_prefix = target_text[: len(target_text) - len(target_text.lstrip())]
     texts = [annotation_to_flat_str(a) for a, _c in annotations]
     annotations_string = " ".join(texts)
-    indent_width = len(indent_prefix.replace('\t', '    '))
+    indent_width = len(indent_prefix.replace("\t", "    "))
     single_len = indent_width + len(annotations_string) + len(stripped)
     max_len = style.line_length if style else 100
     names = [annotation_name(a) for a, _c in annotations]
     has_own_comment = any(c for _a, c in annotations)
-    is_abstract_func = (len(names) == 1 and names[0] == "abstract"
-                        and stripped.startswith("func"))
-    is_abstract_class_name = (len(names) == 1 and names[0] == "abstract"
-                              and stripped.startswith("class_name"))
+    is_abstract_func = (
+        len(names) == 1 and names[0] == "abstract" and stripped.startswith("func")
+    )
+    is_abstract_class_name = (
+        len(names) == 1 and names[0] == "abstract" and stripped.startswith("class_name")
+    )
     enforces_standalone = (
         (stripped.startswith("func") or stripped.startswith("static func"))
-        and not is_abstract_func and not is_abstract_class_name
+        and not is_abstract_func
+        and not is_abstract_class_name
     )
     if single_len <= max_len and not enforces_standalone and not has_own_comment:
         clean_lines[0] = (first[0], f"{indent_prefix}{annotations_string} {stripped}")
         return clean_lines
-    return _render_annotations_standalone(annotations, indent_string, indent_level, style) + clean_lines
+    return (
+        _render_annotations_standalone(annotations, indent_string, indent_level, style)
+        + clean_lines
+    )
 
 
 def format_block(
@@ -214,7 +242,7 @@ def format_block(
         return ([], context_indent_level)
 
     prev_end_line = get_line_safe(statements[0]) if statements else context_indent_level
-    
+
     # Track the last declaration type at this scope level for blank line rules.
     # This is more reliable than _last_statement_type which can be confused by
     # nested body content (e.g., 'pass' inside a class being mistaken as the
@@ -224,7 +252,9 @@ def format_block(
     # Annotations that should end up on the same line as the declaration they
     # decorate are held here until that declaration is rendered. Inside a
     # function body `@warning_ignore` is never joined, so the scope matters.
-    in_function_body = getattr(statement_formatter, '__name__', '') == 'format_func_statement'
+    in_function_body = (
+        getattr(statement_formatter, "__name__", "") == "format_func_statement"
+    )
     pending_annotations: list = []
     # Spacing already emitted on behalf of the next declaration by a comment run.
     deferred = None
@@ -246,7 +276,7 @@ def format_block(
     for i, item in enumerate(statements):
         actual_node = item
         inline_comment = None  # Optional inline comment to append (3-tuple format: tag, node, inline_comment)
-        
+
         # Check for comment marker first
         is_comment_item = False
         if isinstance(item, tuple):
@@ -259,25 +289,38 @@ def format_block(
                 is_comment_item = True
             elif tag == "__root_comment__":
                 is_comment_item = True
-        
+
         # Always get the statement type from the actual node (even for comments)
         # This ensures blank line rules work correctly based on what comes before/after
         stmt_data_str = _get_stmt_type_from_node(actual_node)
         # If it's a comment, use "comment" as the next_name instead of empty string
         if is_comment_item:
             stmt_data_str = "comment"
-        
+
         # Determine if we're at global scope (indent level 0 means top-level file items)
         is_nested = context_indent_level > 0
 
         # A prependable annotation is held back and joined onto the declaration
         # that follows. The first annotation of a run carries the spacing; the
         # rest of the run and the declaration itself emit none.
-        if (not is_comment_item and isinstance(item, tuple) and item[0] == "annotation"
-                and is_prependable_annotation(actual_node, _next_real_type(item_types, i), in_function_body)):
+        if (
+            not is_comment_item
+            and isinstance(item, tuple)
+            and item[0] == "annotation"
+            and is_prependable_annotation(
+                actual_node, _next_real_type(item_types, i), in_function_body
+            )
+        ):
             if not pending_annotations:
                 ann_blanks, deferred = _blank_lines_before_item(
-                    i, statements, item_types, actual_node, prev_end_line, is_nested, style, deferred,
+                    i,
+                    statements,
+                    item_types,
+                    actual_node,
+                    prev_end_line,
+                    is_nested,
+                    style,
+                    deferred,
                 )
                 formatted_lines += ann_blanks
             pending_annotations.append((actual_node, inline_comment))
@@ -299,7 +342,14 @@ def format_block(
             deferred = None
         else:
             blank_lines, deferred = _blank_lines_before_item(
-                i, statements, item_types, actual_node, prev_end_line, is_nested, style, deferred,
+                i,
+                statements,
+                item_types,
+                actual_node,
+                prev_end_line,
+                is_nested,
+                style,
+                deferred,
             )
         formatted_lines += blank_lines
 
@@ -308,13 +358,17 @@ def format_block(
             # longer join the declaration, so emit them standalone first.
             if pending_annotations:
                 formatted_lines += _render_annotations_standalone(
-                    pending_annotations, context_indent_string, context_indent_level, style,
+                    pending_annotations,
+                    context_indent_string,
+                    context_indent_level,
+                    style,
                 )
                 pending_annotations = []
             # Emit the comment directly without going through statement_formatter
             text = _get_comment_text(actual_node)
             comment_indent = _comment_indent(
-                actual_node, context_indent_string,
+                actual_node,
+                context_indent_string,
                 is_trailing=all(
                     item_types[k] == "comment" for k in range(i + 1, len(item_types))
                 ),
@@ -323,9 +377,9 @@ def format_block(
 
         # Only call statement_formatter for non-comment items
         if not is_comment_item:
-            result = statement_formatter(actual_node, context_indent_string, context_indent_level, style)
-
-
+            result = statement_formatter(
+                actual_node, context_indent_string, context_indent_level, style
+            )
 
             # Ensure we get a proper tuple back
             lines = []
@@ -351,10 +405,10 @@ def format_block(
                 # line below too long if written inline... Inline comments are best used for
                 # short comments"), so drop it to the next line whenever that fits.
                 from .class_statement import _display_width
+
                 limit = style.line_length if style else 100
                 own_line = f"{context_indent_string}{inline_comment}"
-                if (_display_width(joined) > limit
-                        and _display_width(own_line) <= limit):
+                if _display_width(joined) > limit and _display_width(own_line) <= limit:
                     clean_lines[-1] = (clean_lines[-1][0], text)
                     clean_lines.append((None, own_line))
                 else:
@@ -364,15 +418,18 @@ def format_block(
             # them standalone when the joined line would overflow).
             if pending_annotations:
                 clean_lines = _join_annotations(
-                    clean_lines, pending_annotations, style,
-                    context_indent_string, context_indent_level,
+                    clean_lines,
+                    pending_annotations,
+                    style,
+                    context_indent_string,
+                    context_indent_level,
                 )
                 pending_annotations = []
 
             formatted_lines += clean_lines
-            
+
             prev_end_line = last_processed_line_no if last_processed_line_no and isinstance(last_processed_line_no, int) else get_end_line_safe(actual_node)  # type: ignore
-            
+
             # Update the tracked declaration type for next iteration's blank rules
             prev_declared_type = stmt_data_str
 
@@ -406,7 +463,9 @@ def _last_statement_type(formatted_lines: FormattedLines) -> str:
             # Strong declaration patterns (declaration header level)
             if stripped.startswith("static func ") or stripped.startswith("func "):
                 found_declarations.append("function_decl")
-            elif stripped.startswith("class ") and not stripped.startswith("class_name"):
+            elif stripped.startswith("class ") and not stripped.startswith(
+                "class_name"
+            ):
                 found_declarations.append("inner_class")
             elif stripped.startswith("signal "):
                 found_declarations.append("signal_decl")
@@ -439,8 +498,11 @@ def _last_statement_type(formatted_lines: FormattedLines) -> str:
 
 
 def _get_blank_lines(
-    prev_name: str, next_name: str, style: StyleConfig, prev_end: int,
-    is_nested_scope: bool = False
+    prev_name: str,
+    next_name: str,
+    style: StyleConfig,
+    prev_end: int,
+    is_nested_scope: bool = False,
 ) -> FormattedLines:
     """Calculate blank lines needed between statements based on config.
 
@@ -453,10 +515,15 @@ def _get_blank_lines(
 
     # Top-level declaration types at file level
     TOP_LEVEL_TYPES = {
-        "extends_stmt", "class_name_stmt",
-        "variable_decl", "constant_decl",
-        "function_decl", "signal_decl",
-        "enum_decl", "inner_class", "abstract_func_decl"
+        "extends_stmt",
+        "class_name_stmt",
+        "variable_decl",
+        "constant_decl",
+        "function_decl",
+        "signal_decl",
+        "enum_decl",
+        "inner_class",
+        "abstract_func_decl",
     }
     at_file_scope = not is_nested_scope
     is_global_scope = at_file_scope and prev_name in TOP_LEVEL_TYPES
@@ -468,15 +535,21 @@ def _get_blank_lines(
     # lines. A leading definition, and a comment before one (which has its own rule
     # below, one blank for a function), are excluded.
     definition_types = {"function_decl", "inner_class"}
-    if (at_file_scope and prev_name not in ("", "comment")
-            and (prev_name in definition_types or next_name in definition_types)):
+    if (
+        at_file_scope
+        and prev_name not in ("", "comment")
+        and (prev_name in definition_types or next_name in definition_types)
+    ):
         return 2 * [(None, "")]
 
     # Nested (inside a function/class) definitions get one blank line around them. This
     # must precede the same-type/identical-kind rules, which would otherwise collapse a
     # func -> func (or class -> class) transition inside a class to zero blanks.
-    if (prev_name not in ("", "comment") and not is_global_scope
-            and (prev_name in definition_types or next_name in definition_types)):
+    if (
+        prev_name not in ("", "comment")
+        and not is_global_scope
+        and (prev_name in definition_types or next_name in definition_types)
+    ):
         return [(None, "")]
 
     # Helper: determine if both are the same structural type group
@@ -485,11 +558,11 @@ def _get_blank_lines(
         var_types = {"variable_decl", "constant_decl"}
         func_types = {"function_decl"}
         class_types = {"inner_class"}
-        
+
         return (
-            (p in var_types and n in var_types) or
-            (p in func_types and n in func_types) or
-            (p in class_types and n in class_types)
+            (p in var_types and n in var_types)
+            or (p in func_types and n in func_types)
+            or (p in class_types and n in class_types)
         )
 
     # --- Same type transitions: 0 blanks at any scope ---
@@ -514,30 +587,39 @@ def _get_blank_lines(
 
     # --- Different types at global scope (not involving comments as prev) ---
     elif is_global_scope and prev_name != "":
-        
+
         # Variable/constant → function/signal: 2 blank lines
-        if (prev_name in {"variable_decl", "constant_decl"} and 
-            next_name in {"function_decl", "signal_decl"}):
+        if prev_name in {"variable_decl", "constant_decl"} and next_name in {
+            "function_decl",
+            "signal_decl",
+        }:
             forced_blanks = 2
 
         # Variable/const → class: 2 blank lines
-        elif prev_name in {"variable_decl", "constant_decl"} and \
-             next_name == "inner_class":
+        elif (
+            prev_name in {"variable_decl", "constant_decl"}
+            and next_name == "inner_class"
+        ):
             forced_blanks = 2
 
         # Function/signal → variable/constant: 2 blank lines
-        elif prev_name in {"function_decl", "signal_decl"} and \
-             next_name in {"variable_decl", "constant_decl"}:
+        elif prev_name in {"function_decl", "signal_decl"} and next_name in {
+            "variable_decl",
+            "constant_decl",
+        }:
             forced_blanks = 2
 
         # Function/signal → class: 2 blank lines
-        elif prev_name in {"function_decl", "signal_decl"} and \
-             next_name == "inner_class":
+        elif (
+            prev_name in {"function_decl", "signal_decl"} and next_name == "inner_class"
+        ):
             forced_blanks = 2
 
         # Class → function/signal: 1 blank line (not 2, matching expected output)
-        elif prev_name == "inner_class" and \
-             next_name in {"function_decl", "signal_decl"}:
+        elif prev_name == "inner_class" and next_name in {
+            "function_decl",
+            "signal_decl",
+        }:
             forced_blanks = 1
 
         # extends_stmt transitions. The style guide's class example has one blank line
@@ -545,7 +627,12 @@ def _get_blank_lines(
         elif prev_name == "extends_stmt":
             if next_name in {"function_decl", "inner_class"}:
                 forced_blanks = 2
-            elif next_name in {"variable_decl", "constant_decl", "signal_decl", "enum_decl"}:
+            elif next_name in {
+                "variable_decl",
+                "constant_decl",
+                "signal_decl",
+                "enum_decl",
+            }:
                 forced_blanks = 1
 
     # --- Different types in nested scope (inside functions/classes) ---
@@ -568,15 +655,22 @@ def _is_top_level_transition(prev_name: str, next_name: str) -> bool:
     signal_decl, enum_decl, inner_class. Comments don't count as statements.
     """
     top_level_types = {
-        "extends_stmt", "class_name_stmt",
-        "variable_decl", "constant_decl",
-        "function_decl", "signal_decl",
-        "enum_decl", "inner_class"
+        "extends_stmt",
+        "class_name_stmt",
+        "variable_decl",
+        "constant_decl",
+        "function_decl",
+        "signal_decl",
+        "enum_decl",
+        "inner_class",
     }
     # Both previous and next should be known top-level types for this to be
     # considered a global scope transition
-    return (prev_name in top_level_types or prev_name == "extends_stmt" or 
-            next_name in top_level_types)
+    return (
+        prev_name in top_level_types
+        or prev_name == "extends_stmt"
+        or next_name in top_level_types
+    )
 
 
 def get_line_safe(node) -> int:
@@ -584,9 +678,11 @@ def get_line_safe(node) -> int:
         if isinstance(node, tuple):
             tag, actual = node  # type: ignore
             from ..common.utils import get_line as _gl
+
             return _gl(actual)
         else:
             from ..common.utils import get_line as _gl
+
             return _gl(node)
     except Exception:
         return 1
@@ -598,22 +694,23 @@ def _content_end_line(node) -> int:
     `meta.end_line` can overshoot past the content onto a trailing `_DEDENT` line, so
     walk the node and take the greatest line of its non-structural tokens instead."""
     from lark import Token as _Token
+
     best = get_line_safe(node)
     stack = [node]
     while stack:
         n = stack.pop()
         if isinstance(n, _Token):
-            if str(getattr(n, 'type', '')).startswith('_'):
+            if str(getattr(n, "type", "")).startswith("_"):
                 continue
-            ln = getattr(n, 'line', None)
+            ln = getattr(n, "line", None)
             if isinstance(ln, int):
                 # A multi-line token (e.g. a triple-quoted string) reports its start
                 # line, so add the newlines it contains to get its end line.
-                ln += str(getattr(n, 'value', '')).count('\n')
+                ln += str(getattr(n, "value", "")).count("\n")
                 if ln > best:
                     best = ln
             continue
-        for c in getattr(n, 'children', []):
+        for c in getattr(n, "children", []):
             if c is not None:
                 stack.append(c)
     return best
@@ -624,9 +721,11 @@ def get_end_line_safe(node) -> int:
         if isinstance(node, tuple):
             tag, actual = node  # type: ignore
             from ..common.utils import get_end_line as _gel
+
             return _gel(actual)
         else:
             from ..common.utils import get_end_line as _gel
+
             return _gel(node)
     except Exception:
         return get_line_safe(node)
@@ -634,19 +733,20 @@ def get_end_line_safe(node) -> int:
 
 def _tree_data_str(node) -> str:
     from lark import Tree
+
     if isinstance(node, Tree):
         d = node.data
-        return str(d) if not hasattr(d, 'value') else d.value  # type: ignore
+        return str(d) if not hasattr(d, "value") else d.value  # type: ignore
     return ""
 
 
 def _get_stmt_type_from_node(node) -> str:
     """Get a statement type identifier from a raw tree node.
-    
+
     Used by format_block to determine blank line rules based on the actual
     statement type (not just 'member' for all tuple-wrapped items).
     """
-    if not hasattr(node, 'data'):
+    if not hasattr(node, "data"):
         return ""
     data = str(_tree_data_str(node)).lower()
     # Map grammar node types to blank-line-friendly identifiers
@@ -667,8 +767,8 @@ def _get_stmt_type_from_node(node) -> str:
     # blank-line purposes, so a run of abstract functions stays tightly spaced.
     if data == "function_decl":
         has_suite = any(
-            hasattr(c, 'data') and 'suite' in str(_tree_data_str(c)).lower()
-            for c in getattr(node, 'children', [])
+            hasattr(c, "data") and "suite" in str(_tree_data_str(c)).lower()
+            for c in getattr(node, "children", [])
         )
         if not has_suite:
             return "abstract_func_decl"
@@ -678,8 +778,9 @@ def _get_stmt_type_from_node(node) -> str:
 def _get_comment_text(comment_node) -> str:
     """Extract the text content from a comment tree node."""
     from .comments import normalize_comment
-    for child in getattr(comment_node, 'children', []):
-        if hasattr(child, 'value'):
+
+    for child in getattr(comment_node, "children", []):
+        if hasattr(child, "value"):
             return normalize_comment(str(child.value))
     return ""
 
@@ -687,13 +788,14 @@ def _get_comment_text(comment_node) -> str:
 def _comment_column(comment_node) -> int:
     """1-based source column of a comment's `#`, or 0 when unknown."""
     from lark import Token as _Token
-    for child in getattr(comment_node, 'children', []):
+
+    for child in getattr(comment_node, "children", []):
         if isinstance(child, _Token):
-            col = getattr(child, 'column', None)
+            col = getattr(child, "column", None)
             if isinstance(col, int):
                 return col
-    meta = getattr(comment_node, 'meta', None)
-    col = getattr(meta, 'column', None) if meta is not None else None
+    meta = getattr(comment_node, "meta", None)
+    col = getattr(meta, "column", None) if meta is not None else None
     return col if isinstance(col, int) else 0
 
 

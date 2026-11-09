@@ -83,7 +83,8 @@ def test_github_format_output_on_stdout(tmp_path):
     # var Xx = 1 triggers a constant-name violation
     dummy_file = write_file(tmp_path, "script.gd", "var Xx = 1")
     outcome = subprocess.run(
-        ["gdlint", "--output-format", "github", dummy_file], check=False,
+        ["gdlint", "--output-format", "github", dummy_file],
+        check=False,
         capture_output=True,
     )
     assert outcome.returncode != 0
@@ -99,7 +100,8 @@ def test_github_format_contains_file_line_col(tmp_path):
     """GitHub format annotations should include file, line, and column."""
     dummy_file = write_file(tmp_path, "script.gd", "var Xx = 1")
     outcome = subprocess.run(
-        ["gdlint", "--output-format", "github", dummy_file], check=False,
+        ["gdlint", "--output-format", "github", dummy_file],
+        check=False,
         capture_output=True,
     )
     annotation = outcome.stdout.decode().strip()
@@ -113,7 +115,8 @@ def test_text_format_unchanged(tmp_path):
     """Default text format should still output to stderr."""
     dummy_file = write_file(tmp_path, "script.gd", "var Xx = 1")
     outcome = subprocess.run(
-        ["gdlint", dummy_file], check=False,
+        ["gdlint", dummy_file],
+        check=False,
         capture_output=True,
     )
     assert outcome.returncode != 0
@@ -128,11 +131,13 @@ def test_github_format_explicit_text_flag(tmp_path):
     """--output-format text should behave identically to no flag."""
     dummy_file = write_file(tmp_path, "script.gd", "var Xx = 1")
     outcome_with_flag = subprocess.run(
-        ["gdlint", "--output-format", "text", dummy_file], check=False,
+        ["gdlint", "--output-format", "text", dummy_file],
+        check=False,
         capture_output=True,
     )
     outcome_default = subprocess.run(
-        ["gdlint", dummy_file], check=False,
+        ["gdlint", dummy_file],
+        check=False,
         capture_output=True,
     )
     assert outcome_with_flag.stderr == outcome_default.stderr

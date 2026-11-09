@@ -8,35 +8,39 @@ from lark import Token, Tree
 # Container rules that receive variable-length children and can hold comments.
 # Fixed-position nodes (e.g. function_decl) never get comments so consumers
 # can still index their children safely. These names match the root gdscript.lark.
-CONTAINER_RULES = frozenset({
-    "start",
-    "class_block",
-    "suite",
-    "match_stmt",
-    "property",
-    "arguments",
-    "elements",
-    "dict_entries",
-    "parameters",
-    "signal_parameters",
-    "enum_entries",
-    "array_pattern_items",
-    "dict_pattern_items",
-    "property",
-    "untitled_property",
-})
+CONTAINER_RULES = frozenset(
+    {
+        "start",
+        "class_block",
+        "suite",
+        "match_stmt",
+        "property",
+        "arguments",
+        "elements",
+        "dict_entries",
+        "parameters",
+        "signal_parameters",
+        "enum_entries",
+        "array_pattern_items",
+        "dict_pattern_items",
+        "property",
+        "untitled_property",
+    }
+)
 
 
 # Bracketed constructs whose comments belong to them even when there is no list child to
 # hold them (an empty collection's only content is the comment). A comment inserted here
 # becomes a direct child of the bracketed node, which the layout helpers read.
-BRACKETED_RULES = frozenset({
-    "array_literal",
-    "dict_literal",
-    "array_pattern",
-    "dict_pattern",
-    "call_suffix",
-})
+BRACKETED_RULES = frozenset(
+    {
+        "array_literal",
+        "dict_literal",
+        "array_pattern",
+        "dict_pattern",
+        "call_suffix",
+    }
+)
 
 # Block scopes. A block's span reaches past its last statement onto the line where the
 # dedent is detected, so span containment alone swallowed a trailing comment indented
@@ -70,9 +74,7 @@ def _comment_node(tok: Token) -> Tree:
     m = node.meta
     m.empty = False
     m.line, m.column, m.start_pos = tok.line, tok.column, tok.start_pos
-    m.end_line, m.end_column, m.end_pos = (
-        tok.end_line, tok.end_column, tok.end_pos
-    )
+    m.end_line, m.end_column, m.end_pos = (tok.end_line, tok.end_column, tok.end_pos)
     return node
 
 
@@ -127,7 +129,11 @@ def _find_container(tree: Tree, pos: int, column: int = 0) -> Tree:
         for child in node.children:
             if isinstance(child, Tree):
                 sp = _span(child)
-                if sp and sp[0] <= pos < sp[1] and not _trails_shallow_block(child, pos, column):
+                if (
+                    sp
+                    and sp[0] <= pos < sp[1]
+                    and not _trails_shallow_block(child, pos, column)
+                ):
                     nxt = child
                     break
         if nxt is None:
@@ -139,8 +145,11 @@ def _find_container(tree: Tree, pos: int, column: int = 0) -> Tree:
             # block. Without this the comment was hoisted out of the expression and
             # emitted as a standalone statement next to it.
             for child in node.children:
-                if (isinstance(child, Tree) and child.data in CONTAINER_RULES
-                        and not _trails_shallow_block(child, pos, column)):
+                if (
+                    isinstance(child, Tree)
+                    and child.data in CONTAINER_RULES
+                    and not _trails_shallow_block(child, pos, column)
+                ):
                     return child
             if node.data in BRACKETED_RULES:
                 # An empty collection's only content is the comment and its list child is

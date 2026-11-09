@@ -18,8 +18,9 @@ def format_simple_statement(
     # is a standalone comment and gets its own. Emitting every comment on its own line is what
     # moved `extends Node2D  # World` onto two lines, since the head statements are formatted
     # through here and their trailing comment is a child.
-    for child in getattr(statement, 'children', []):
+    for child in getattr(statement, "children", []):
         from lark import Tree
+
         if isinstance(child, Tree) and _tree_data_str(child) == "comment":
             comment_text = _get_comment_text(child)
             if get_line(child) == stmt_line:
@@ -38,9 +39,10 @@ def format_simple_statement(
 def _tree_data_str(node):
     """Return a tree's rule name as a plain string."""
     from lark import Tree
+
     if isinstance(node, Tree):
         d = node.data
-        return d.value if hasattr(d, 'value') else str(d)
+        return d.value if hasattr(d, "value") else str(d)
     return ""
 
 
@@ -48,6 +50,7 @@ def _get_comment_text(comment_node) -> str:
     """Extract the text content from a comment tree node."""
     from lark import Tree
     from .comments import normalize_comment
+
     if not isinstance(comment_node, Tree):
         return ""
     for child in comment_node.children:

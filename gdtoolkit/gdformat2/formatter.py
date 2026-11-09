@@ -26,22 +26,26 @@ def format_code(
         Formatted GDScript source code as a string.
     """
     tab_size = 4 if not style.use_spaces else style.tab_size
-    indent_string = "\t" * ((tab_size) // max(tab_size, 1)) if not style.use_spaces else " " * (tab_size or 4)
+    indent_string = (
+        "\t" * ((tab_size) // max(tab_size, 1))
+        if not style.use_spaces
+        else " " * (tab_size or 4)
+    )
 
     # Extract top-level items from root start node
     top_items = _extract_top_level(tree)
 
     # Root-level items have no indentation (column 0)
     formatted_lines, _last_line = format_block(
-        top_items,
-        format_class_statement,
-        "", 0, style
+        top_items, format_class_statement, "", 0, style
     )
 
     if formatted_lines and formatted_lines[-1][1] != "":
         formatted_lines.append((None, ""))
 
-    formatted_lines = _limit_preserving_continuations(formatted_lines, style, indent_string)
+    formatted_lines = _limit_preserving_continuations(
+        formatted_lines, style, indent_string
+    )
 
     return "\n".join(line for _, line in formatted_lines)
 
@@ -80,14 +84,17 @@ def _relax_one_block(lines, limit, indent_string):
         # the code then keeps the indent the guide asks for, and the long line is the
         # `unbreakable-line` check's business - a 96-column parameter name cannot be fixed by
         # indenting it, and dedenting for nothing makes the block harder to read.
-        if not any(text.startswith(opener_indent + unit + unit) for _n, text in lines[start:end]):
+        if not any(
+            text.startswith(opener_indent + unit + unit)
+            for _n, text in lines[start:end]
+        ):
             continue
         if max(widths) - unit_width > limit:
             continue
         for index in range(start, end):
             line_no, text = lines[index]
             if text.startswith(unit):
-                lines[index] = (line_no, text[len(unit):])
+                lines[index] = (line_no, text[len(unit) :])
         return True
     return False
 
@@ -112,7 +119,9 @@ def _paren_blocks(lines):
 
 
 def _block_is_over_long(lines, start, end, limit):
-    return any(len(text.replace("\t", "    ")) > limit for _line_no, text in lines[start:end])
+    return any(
+        len(text.replace("\t", "    ")) > limit for _line_no, text in lines[start:end]
+    )
 
 
 def _extract_top_level(tree: Tree):
@@ -136,30 +145,34 @@ def _extract_top_level(tree: Tree):
     # Move a top-level enum's / annotation's same-line comments out of the file scope so
     # their formatter can attach them positionally.
     from gdtoolkit.gdformat2.class_statement import _absorb_member_comments as _absorb
-    _root_children = getattr(tree, 'children', [])
+
+    _root_children = getattr(tree, "children", [])
     for _c in list(_root_children):
-        if hasattr(_c, 'data') and _tree_data_str(_c).lower() in ('class_member', 'annotation'):
+        if hasattr(_c, "data") and _tree_data_str(_c).lower() in (
+            "class_member",
+            "annotation",
+        ):
             _absorb(_c, _root_children)
 
     # Build annotation span map for determining which comments belong inside
     ann_spans = {}
-    for child in getattr(tree, 'children', []):
+    for child in getattr(tree, "children", []):
         if isinstance(child, Tree) and _tree_data_str(child).lower() == "annotation":
-            meta = getattr(child, 'meta', None)
+            meta = getattr(child, "meta", None)
             if meta:
-                start_pos = getattr(meta, 'start_pos', -1)
-                end_pos = getattr(meta, 'end_pos', -1)
+                start_pos = getattr(meta, "start_pos", -1)
+                end_pos = getattr(meta, "end_pos", -1)
                 ann_spans[start_pos] = (child, end_pos)
 
-    for child in getattr(tree, 'children', []):
-        if not hasattr(child, 'data'):
+    for child in getattr(tree, "children", []):
+        if not hasattr(child, "data"):
             continue
         data_str = _tree_data_str(child).lower()
 
         if "comment" in data_str and isinstance(child, Tree):
             # Check if this comment falls inside any annotation's span
-            c_start = getattr(getattr(child, 'meta', None), 'start_pos', -1)
-            
+            c_start = getattr(getattr(child, "meta", None), "start_pos", -1)
+
             inside_any_ann = False
             for ann_start, (ann_node, ann_end) in ann_spans.items():
                 if ann_start <= c_start < ann_end:
@@ -167,7 +180,7 @@ def _extract_top_level(tree: Tree):
                     _attach_comment_to_annotation(ann_node, child)
                     inside_any_ann = True
                     break
-            
+
             if not inside_any_ann:
                 # Flush any pending annotations first so a same-line comment can
                 # attach to the annotation it trails.
@@ -188,7 +201,7 @@ def _extract_top_level(tree: Tree):
             continue
 
         # Direct file-level items (extends, class_name) - flush any pending annotations first
-        elif data_str in ('extends_stmt', 'class_name_stmt'):
+        elif data_str in ("extends_stmt", "class_name_stmt"):
             if pending_annotations:
                 for ann in pending_annotations:
                     items.append(("annotation", ann))
@@ -204,10 +217,12 @@ def _extract_top_level(tree: Tree):
 
             # class_member wraps the actual declarations - unwrap them
             from gdtoolkit.gdformat2.class_statement import (
-                _find_suite_or_empty as _fsoe, _tree_data_str as _tds,
+                _find_suite_or_empty as _fsoe,
+                _tree_data_str as _tds,
             )
-            for sub_child in getattr(child, 'children', []):
-                if hasattr(sub_child, 'data'):
+
+            for sub_child in getattr(child, "children", []):
+                if hasattr(sub_child, "data"):
                     sd = _tree_data_str(sub_child).lower()
                     # Skip end containers and NL markers - they're not declarations
                     if sd != "end" and not sd.startswith("_nl"):
@@ -235,12 +250,22 @@ def _attach_inline_to_previous(items, comment_node) -> bool:
     from .comments import normalize_comment
     from ..common.utils import get_end_line
 
-    tok = next((t for t in getattr(comment_node, 'children', []) if isinstance(t, Token)), None)
-    c_line = getattr(tok, 'line', 0) if tok is not None else getattr(getattr(comment_node, 'meta', None), 'line', 0)
+    tok = next(
+        (t for t in getattr(comment_node, "children", []) if isinstance(t, Token)), None
+    )
+    c_line = (
+        getattr(tok, "line", 0)
+        if tok is not None
+        else getattr(getattr(comment_node, "meta", None), "line", 0)
+    )
     if not c_line or not items:
         return False
     prev = items[-1]
-    if not (isinstance(prev, tuple) and prev[0] in ('member', 'annotation') and len(prev) == 2):
+    if not (
+        isinstance(prev, tuple)
+        and prev[0] in ("member", "annotation")
+        and len(prev) == 2
+    ):
         return False
     prev_node = prev[1]
     try:
@@ -249,7 +274,7 @@ def _attach_inline_to_previous(items, comment_node) -> bool:
         return False
     if prev_end != c_line:
         return False
-    text = normalize_comment(str(getattr(tok, 'value', ''))) if tok is not None else ""
+    text = normalize_comment(str(getattr(tok, "value", ""))) if tok is not None else ""
     if not text:
         return False
     items[-1] = (prev[0], prev_node, text)
@@ -266,29 +291,29 @@ def _last_code_line(node) -> int:
     """
     from ..common.utils import get_end_line
 
-    ignore = ('_NL', '_INDENT', '_DEDENT', 'END', 'END_OF_FILE')
+    ignore = ("_NL", "_INDENT", "_DEDENT", "END", "END_OF_FILE")
     lines = [
-        getattr(token, 'line', 0)
+        getattr(token, "line", 0)
         for token in node.scan_values(lambda child: isinstance(child, Token))
-        if str(getattr(token, 'type', '')).upper() not in ignore
+        if str(getattr(token, "type", "")).upper() not in ignore
     ]
     return max(lines) if lines else get_end_line(node)
 
 
 def _attach_comment_to_annotation(annotation_node: Tree, comment_node: Tree) -> None:
     """Attach a sibling comment to the annotation node's children.
-    
+
     Comments that appear inside an annotation's character span (between its
     start and end positions) are re-inserted as children of the annotation.
     This preserves them during formatting so they can be emitted inline.
     """
     # Find arguments subtree to attach comment before closing paren
     args_tree = None
-    for i, c in enumerate(getattr(annotation_node, 'children', [])):
+    for i, c in enumerate(getattr(annotation_node, "children", [])):
         if isinstance(c, Tree) and _tree_data_str(c).lower() == "arguments":
             args_tree = c
             break
-    
+
     # Insert comment after the last argument but before any closing paren token
     if args_tree is not None:
         # Append to arguments as sibling of elements - this keeps it with content
@@ -300,7 +325,8 @@ def _attach_comment_to_annotation(annotation_node: Tree, comment_node: Tree) -> 
 
 def _tree_data_str(node) -> str:
     from lark import Tree
+
     if isinstance(node, Tree):
         d = node.data
-        return str(d) if not hasattr(d, 'value') else d.value  # type: ignore
+        return str(d) if not hasattr(d, "value") else d.value  # type: ignore
     return ""

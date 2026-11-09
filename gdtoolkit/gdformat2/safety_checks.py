@@ -38,8 +38,14 @@ class LoosenTreeTransformer(Transformer):
         """
         from lark import Token as LarkToken
         from lark import Tree as LarkTree
-        if (len(args) == 3 and isinstance(args[0], LarkToken) and isinstance(args[2], LarkToken)
-                and str(args[0]) == "(" and str(args[2]) == ")"):
+
+        if (
+            len(args) == 3
+            and isinstance(args[0], LarkToken)
+            and isinstance(args[2], LarkToken)
+            and str(args[0]) == "("
+            and str(args[2]) == ")"
+        ):
             return args[1]
         return LarkTree("primary", args)
 
@@ -52,6 +58,7 @@ class LoosenTreeTransformer(Transformer):
         from lark import Token as LarkToken
         from lark import Tree as LarkTree
         from .comments import normalize_comment
+
         canonical = []
         for arg in args:
             if isinstance(arg, LarkToken):
@@ -63,82 +70,103 @@ class LoosenTreeTransformer(Transformer):
     def asless_actual_neg_expr(self, args):
         from lark import Token as LarkToken
         from lark import Tree as LarkTree
+
         if isinstance(args[1], LarkToken) and str(args[1].type) == "NUMBER":  # type: ignore
             return LarkToken("NUMBER", f"-{args[1].value}")  # type: ignore
         return LarkTree("asless_actual_neg_expr", args)
 
     def asless_comparison(self, args):
         from lark import Tree as LarkTree
+
         return LarkTree("comparison", args)
 
     def asless_and_test(self, args):
         from lark import Tree as LarkTree
+
         return LarkTree("and_test", args)
 
     def asless_or_test(self, args):
         from lark import Tree as LarkTree
+
         return LarkTree("or_test", args)
 
     def asless_bitw_or(self, args):
         from lark import Tree as LarkTree
+
         return LarkTree("bitw_or", args)
 
     def asless_bitw_xor(self, args):
         from lark import Tree as LarkTree
+
         return LarkTree("bitw_xor", args)
 
     def asless_bitw_and(self, args):
         from lark import Tree as LarkTree
+
         return LarkTree("bitw_and", args)
 
     def asless_shift_expr(self, args):
         from lark import Tree as LarkTree
+
         return LarkTree("shift_expr", args)
 
     def asless_type_test(self, args):
         from lark import Tree as LarkTree
+
         return LarkTree("type_test", args)
 
     def asless_content_test(self, args):
         from lark import Tree as LarkTree
+
         return LarkTree("content_test", args)
 
     def asless_test_expr(self, args):
         from lark import Tree as LarkTree
+
         return LarkTree("test_expr", args)
 
     def asless_arith_expr(self, args):
         from lark import Tree as LarkTree
+
         return LarkTree("arith_expr", args)
 
     def asless_mdr_expr(self, args):
         from lark import Tree as LarkTree
+
         return LarkTree("mdr_expr", args)
 
     def asless_pow_expr(self, args):
         from lark import Tree as LarkTree
+
         return LarkTree("pow_expr", args)
 
     def signal_stmt(self, args):
         from lark import Tree as LarkTree
-        if len(args) > 1 and (not hasattr(args[1], 'children') or len(args[1].children) == 0):
+
+        if len(args) > 1 and (
+            not hasattr(args[1], "children") or len(args[1].children) == 0
+        ):
             return LarkTree("signal_stmt", args[:-1])
         return LarkTree("signal_stmt", args)
 
     def start(self, args):
         from lark import Tree as LarkTree
+
         # Filter out annotation and property_body_def nodes (handled separately by parser)
         return LarkTree(
             "start",
             [
-                arg for arg in args
-                if not isinstance(arg, Tree) or str(arg.data).startswith("class_member")  # type: ignore
+                arg
+                for arg in args
+                if not isinstance(arg, Tree)
+                or str(arg.data).startswith("class_member")  # type: ignore
                 or str(arg.data) in ("extends_stmt", "class_name_stmt")  # type: ignore
             ],
         )
 
     def class_def(self, args):
         from lark import Tree as LarkTree
+
         return LarkTree(
             "class_def",
             [arg for arg in args if not isinstance(arg, Tree) or str(arg.data).startswith("class_member")],  # type: ignore
@@ -146,9 +174,12 @@ class LoosenTreeTransformer(Transformer):
 
     def inner_class(self, args):
         from lark import Tree as LarkTree
+
         return LarkTree(
             "inner_class",
-            [arg for arg in args if not isinstance(arg, Tree)],  # Filter annotations at class level
+            [
+                arg for arg in args if not isinstance(arg, Tree)
+            ],  # Filter annotations at class level
         )
 
 
@@ -184,13 +215,18 @@ def _collapse_single_child(node):
         # the same statements whether or not each one is wrapped. Unwrapping it compares
         # the body, not which wrapper the block form happened to use.
         statements = [
-            child for child in children
+            child
+            for child in children
             if isinstance(child, Tree) and not _is_structural_end(child)
         ]
         if len(statements) == 1:
             return statements[0]
-    if (str(node.data) == "sign" and len(children) == 2
-            and isinstance(children[0], Token) and str(children[0]) == "+"):
+    if (
+        str(node.data) == "sign"
+        and len(children) == 2
+        and isinstance(children[0], Token)
+        and str(children[0]) == "+"
+    ):
         # A unary plus is a no-op the guide drops, so `+x` and `x` are the same value.
         return children[1]
     if len(children) == 1 and isinstance(children[0], Tree):
@@ -226,6 +262,7 @@ def _canonical_token(token):
         # and so is which quote it escapes. Compare the decoded value where Python can
         # decode it, and the raw text otherwise (a GDScript-only escape).
         import ast
+
         try:
             return Token(str(token.type), repr(ast.literal_eval(str(token))))
         except (ValueError, SyntaxError):
@@ -249,13 +286,17 @@ def _strip_placeholders_and_trailing_comma(node):
         _strip_placeholders_and_trailing_comma(child) for child in node.children
     ]
     children = [
-        child for child in children
+        child
+        for child in children
         if child is not None
         and not _is_structural_end(child)
         and not (isinstance(child, Token) and str(child) == ";")
     ]
-    while (len(children) >= 2 and isinstance(children[-1], Token)
-            and str(children[-1]) == ","):
+    while (
+        len(children) >= 2
+        and isinstance(children[-1], Token)
+        and str(children[-1]) == ","
+    ):
         children.pop()
     return Tree(node.data, children)
 
@@ -268,9 +309,9 @@ def _normalize_for_comparison(node):
     precedence rung. So the placeholders go first, then the collapsing, then the trailing
     commas - which the collapse cannot affect, since it only removes single-child parents.
     """
-    return _strip_placeholders_and_trailing_comma(_collapse_single_child(
-        _strip_placeholders_and_trailing_comma(node)
-    ))
+    return _strip_placeholders_and_trailing_comma(
+        _collapse_single_child(_strip_placeholders_and_trailing_comma(node))
+    )
 
 
 def check_tree_invariant(

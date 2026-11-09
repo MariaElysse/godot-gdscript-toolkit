@@ -30,8 +30,16 @@ class GDScriptIndenter(Indenter):
     def collect_comment(self, token: Token) -> Token:
         """Lexer callback for stand-alone (ignored) ``COMMENT`` tokens."""
         self.comments.append(
-            Token("COMMENT", str(token), token.start_pos, token.line,
-                  token.column, token.end_line, token.end_column, token.end_pos)
+            Token(
+                "COMMENT",
+                str(token),
+                token.start_pos,
+                token.line,
+                token.column,
+                token.end_line,
+                token.end_column,
+                token.end_pos,
+            )
         )
         return token
 
@@ -49,9 +57,16 @@ class GDScriptIndenter(Indenter):
                 column = nl.column + off
             value = m.group()
             self.comments.append(
-                Token("COMMENT", value, start_pos=nl.start_pos + off,
-                      line=line, column=column, end_line=line,
-                      end_column=column + len(value), end_pos=nl.start_pos + off + len(value))
+                Token(
+                    "COMMENT",
+                    value,
+                    start_pos=nl.start_pos + off,
+                    line=line,
+                    column=column,
+                    end_line=line,
+                    end_column=column + len(value),
+                    end_pos=nl.start_pos + off + len(value),
+                )
             )
 
     # -- indentation ---------------------------------------------------------
@@ -145,9 +160,12 @@ class GDScriptIndenter(Indenter):
         made here, where both neighbours are visible: a ``get``/``set`` name right after a
         colon and followed by the accessor's ``=``, ``(`` or ``:``.
         """
-        if (token.type == "NAME" and str(token.value) in ("get", "set")
-                and prev_type == "COLON"
-                and next_token.type in ("EQUAL", "PARENTHESIS_OPEN", "COLON")):
+        if (
+            token.type == "NAME"
+            and str(token.value) in ("get", "set")
+            and prev_type == "COLON"
+            and next_token.type in ("EQUAL", "PARENTHESIS_OPEN", "COLON")
+        ):
             return Token.new_borrow_pos("GET_SET", str(token.value), token)
         return token
 
@@ -213,8 +231,17 @@ class GDScriptIndenter(Indenter):
             # COLON and the closing parenthesis: `[FORWARD_ARROW return_type]`, where
             # `return_type: type | VOID` and `type: NAME (PERIOD NAME)* [...]`.
             lambda t: (
-                t.type in ["_NL", "FORWARD_ARROW", "VOID", "NAME", "PERIOD",
-                           "BRACKET_OPEN", "BRACKET_CLOSE", "COMMA"]
+                t.type
+                in [
+                    "_NL",
+                    "FORWARD_ARROW",
+                    "VOID",
+                    "NAME",
+                    "PERIOD",
+                    "BRACKET_OPEN",
+                    "BRACKET_CLOSE",
+                    "COMMA",
+                ]
                 or t.value == "->"
             ),
             lpar_accept_function,

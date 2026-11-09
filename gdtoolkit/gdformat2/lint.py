@@ -45,9 +45,7 @@ from lark import Token, Tree
 
 from .parser import parser as _parser
 
-GUIDE_BASE_URL = (
-    "https://docs.godotengine.org/en/stable/tutorials/scripting/gdscript/gdscript_styleguide.html"
-)
+GUIDE_BASE_URL = "https://docs.godotengine.org/en/stable/tutorials/scripting/gdscript/gdscript_styleguide.html"
 
 # The guide's own code order ("Code order"), used both to rank a declaration and to tell the
 # reader the order they should have written. Every entry is (key, label).
@@ -147,7 +145,9 @@ class Problem:
 class _Context:
     """What every check gets: the source, its lines, the tree and the file name."""
 
-    def __init__(self, source: str, tree: Optional[Tree], filename: Optional[str], config):
+    def __init__(
+        self, source: str, tree: Optional[Tree], filename: Optional[str], config
+    ):
         self.source = source
         self.lines = source.splitlines()
         self.tree = tree
@@ -192,7 +192,9 @@ def lint_code(
         problem for problem in problems if problem.check not in _disabled(config)
     ]
     problems = _suppress_ignored(problems, context)
-    return sorted(problems, key=lambda problem: (problem.line, problem.column, problem.check))
+    return sorted(
+        problems, key=lambda problem: (problem.line, problem.column, problem.check)
+    )
 
 
 def lint_path(path: str, config: MappingProxyType = DEFAULT_CONFIG) -> List[Problem]:
@@ -345,9 +347,17 @@ def _code_order_problems(members: List, order: Sequence[str]) -> List[Problem]:
                 continue
             section = "doc comment"
             rank = order.index(section) if section in order else -1
-        elif rule in ("class_member", "variable_decl", "constant_decl", "signal_decl",
-                      "enum_decl", "function_decl", "inner_class", "extends_stmt",
-                      "class_name_stmt"):
+        elif rule in (
+            "class_member",
+            "variable_decl",
+            "constant_decl",
+            "signal_decl",
+            "enum_decl",
+            "function_decl",
+            "inner_class",
+            "extends_stmt",
+            "class_name_stmt",
+        ):
             section = _section_of(member, pending_annotations)
             rank = order.index(section) if section in order else -1
             if rank < 0:
@@ -474,7 +484,8 @@ def _check_continuation_indent(context: _Context) -> List[Problem]:
         # indent problem.
         widths = [context.display_width(line) for line in content]
         relaxes = bool(widths) and (
-            max(widths) <= context.max_line_length
+            max(widths)
+            <= context.max_line_length
             < max(widths) + context.tab_characters
         )
         expected = one_level if relaxes else two_levels
@@ -498,11 +509,15 @@ def _check_continuation_indent(context: _Context) -> List[Problem]:
             )
     for line_index, opener_indent in backslashes:
         following = context.lines[line_index + 1]
-        levels = (context.indentation_width(following) - opener_indent) // context.tab_characters
+        levels = (
+            context.indentation_width(following) - opener_indent
+        ) // context.tab_characters
         if levels >= 2:
             continue
-        if (context.display_width(following) + (2 - levels) * context.tab_characters
-                > context.max_line_length):
+        if (
+            context.display_width(following) + (2 - levels) * context.tab_characters
+            > context.max_line_length
+        ):
             continue
         problems.append(
             Problem(
@@ -546,15 +561,15 @@ def _continuation_blocks(context: _Context):
                 if character == "\\":
                     position += 2
                     continue
-                if quote in ('"""', "'''") and line[position: position + 3] == quote:
+                if quote in ('"""', "'''") and line[position : position + 3] == quote:
                     quote = ""
                     position += 3
                     continue
                 if quote in ('"', "'") and character == quote:
                     quote = ""
             elif character in "\"'":
-                if line[position: position + 3] in ('"""', "'''"):
-                    quote = line[position: position + 3]
+                if line[position : position + 3] in ('"""', "'''"):
+                    quote = line[position : position + 3]
                     position += 3
                     continue
                 quote = character
@@ -566,7 +581,11 @@ def _continuation_blocks(context: _Context):
                 opener, opener_indent, opener_index = stack.pop()
                 blocks.append((opener_index + 1, index, opener_indent, opener))
             position += 1
-        if not quote and line.rstrip().endswith("\\") and index + 1 < len(context.lines):
+        if (
+            not quote
+            and line.rstrip().endswith("\\")
+            and index + 1 < len(context.lines)
+        ):
             backslashes.append((index, indent))
     return blocks, backslashes
 
@@ -611,7 +630,9 @@ def _check_unbreakable_line(context: _Context) -> List[Problem]:
                 column=0,
                 message=(
                     "the line is {} columns and {} on its own, so no reflow fits it under "
-                    "{}".format(context.display_width(line), what, context.max_line_length)
+                    "{}".format(
+                        context.display_width(line), what, context.max_line_length
+                    )
                 ),
                 suggestion=action,
                 section="line-length",
@@ -657,7 +678,9 @@ def _run_of(context: _Context, tokens: Sequence[Token]) -> Tuple[int, str, str]:
     best_width = 0
     run: List[Token] = []
     for token in list(tokens) + [None]:  # type: ignore[list-item]
-        if run and (token is None or token.column != run[-1].column + len(str(run[-1].value))):
+        if run and (
+            token is None or token.column != run[-1].column + len(str(run[-1].value))
+        ):
             width = _run_width(run)
             if width > best_width:
                 best, best_width = run, width
@@ -712,7 +735,9 @@ def _check_commented_out_code(context: _Context) -> List[Problem]:
 
 def _looks_like_code(text: str) -> bool:
     """Whether a comment's text is a GDScript statement rather than a sentence."""
-    if not text or text.startswith(("http://", "https://", "TODO", "FIXME", "NOTE", "XXX")):
+    if not text or text.startswith(
+        ("http://", "https://", "TODO", "FIXME", "NOTE", "XXX")
+    ):
         return False
     words = text.split()
     if len(words) == 1 and not any(character in text for character in "()[]{}="):
@@ -764,7 +789,9 @@ def _check_redundant_type_hint(context: _Context) -> List[Problem]:
                 line=_line_of(declaration),
                 column=_column_of(declaration),
                 message=(
-                    "the type `{}` repeats what `{}(...)` already says".format(declared, called)
+                    "the type `{}` repeats what `{}(...)` already says".format(
+                        declared, called
+                    )
                 ),
                 suggestion="write `:=` instead of the explicit type",
                 section="inferred-types",
@@ -798,7 +825,9 @@ def _check_ambiguous_inferred_type(context: _Context) -> List[Problem]:
                 check="ambiguous-inferred-type",
                 line=_line_of(declaration),
                 column=_column_of(declaration),
-                message="`:=` infers a type that may not be the intended one: {}".format(reason),
+                message="`:=` infers a type that may not be the intended one: {}".format(
+                    reason
+                ),
                 suggestion="write the type explicitly, or initialize with a typed value",
                 section="inferred-types",
             )
@@ -848,7 +877,8 @@ def _called_name(value) -> Optional[str]:
         return None
     children = _children(expression)
     if len(children) < 2 or not all(
-        isinstance(child, Tree) and _rule(child) == "call_suffix" for child in children[1:]
+        isinstance(child, Tree) and _rule(child) == "call_suffix"
+        for child in children[1:]
     ):
         return None
     return _base_name(children[0]) or None
@@ -879,7 +909,9 @@ def _check_file_name(context: _Context) -> List[Problem]:
         expected = _snake_case(class_name)
         if expected != stem:
             suggestions.append(
-                "rename it to `{}.gd` to match `class_name {}`".format(expected, class_name)
+                "rename it to `{}.gd` to match `class_name {}`".format(
+                    expected, class_name
+                )
             )
     if not suggestions:
         return []
@@ -930,7 +962,9 @@ def _check_signal_past_tense(context: _Context) -> List[Problem]:
         token = _token(node, "NAME")
         name = str(getattr(token, "value", "")) if token is not None else ""
         last_word = name.rsplit("_", 1)[-1]
-        if last_word.endswith("ing") or ("_" in name and last_word.endswith(("s", "es"))):
+        if last_word.endswith("ing") or (
+            "_" in name and last_word.endswith(("s", "es"))
+        ):
             problems.append(
                 Problem(
                     check="signal-past-tense",
@@ -939,7 +973,9 @@ def _check_signal_past_tense(context: _Context) -> List[Problem]:
                     message="`{}` is not in the past tense".format(name),
                     suggestion=(
                         "name the signal for what happened, e.g. `{}`".format(
-                            name.rsplit("_", 1)[0] + "_changed" if "_" in name else "changed"
+                            name.rsplit("_", 1)[0] + "_changed"
+                            if "_" in name
+                            else "changed"
                         )
                     ),
                     section="signals",
@@ -1004,7 +1040,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if os.path.isdir(argument):
             for root, _directories, filenames in os.walk(argument):
                 paths.extend(
-                    os.path.join(root, name) for name in sorted(filenames)
+                    os.path.join(root, name)
+                    for name in sorted(filenames)
                     if name.endswith(".gd")
                 )
         else:

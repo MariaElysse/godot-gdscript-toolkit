@@ -67,7 +67,9 @@ def main():
     )
 
     line_length = (
-        int(arguments["--line-length"]) if arguments["--line-length"] else config.get("line_length", 100)
+        int(arguments["--line-length"])
+        if arguments["--line-length"]
+        else config.get("line_length", 100)
     )
     use_spaces = None
     spaces_for_indent = None
@@ -75,7 +77,11 @@ def main():
         use_spaces = True
         spaces_for_indent = int(arguments["--use-spaces"])
 
-    safety_checks_enabled = not arguments["--fast"] if arguments.get("--fast") else config.get("safety_checks", True)
+    safety_checks_enabled = (
+        not arguments["--fast"]
+        if arguments.get("--fast")
+        else config.get("safety_checks", True)
+    )
 
     # GDScript indents with tabs, so tabs are the default and `--use-spaces` is the
     # opt-out. This used to read `spaces_for_indent is None`, which is True when the flag
@@ -90,13 +96,16 @@ def main():
     if files == ["-"]:
         _format_stdin(style, safety_checks_enabled)
     elif arguments["--check"]:
-        _check_files_formatting(files, style, arguments["--diff"], safety_checks_enabled)
+        _check_files_formatting(
+            files, style, arguments["--diff"], safety_checks_enabled
+        )
     else:
         _format_files(files, style, safety_checks_enabled)
 
 
 def _dump_default_config() -> None:
     import os as _os
+
     assert not _os.path.isfile(CONFIG_FILE_NAME)
     with open(CONFIG_FILE_NAME, "w", encoding="utf-8") as handle:
         config = {
@@ -130,7 +139,12 @@ def _load_config_file_or_default(config_path: Optional[str]) -> dict:
         with open(config_path, "r", encoding="utf-8") as handle:
             loaded = yaml.safe_load(handle.read())
             return dict(loaded) if loaded else {}
-    return {"excluded_directories": [".git"], "safety_checks": True, "use_spaces": False, "line_length": 100}
+    return {
+        "excluded_directories": [".git"],
+        "safety_checks": True,
+        "use_spaces": False,
+        "line_length": 100,
+    }
 
 
 def _format_stdin(style: StyleConfig, safety_checks_enabled: bool) -> None:
@@ -156,10 +170,15 @@ def _check_files_formatting(
                     print(f"would reformat {file_path}", file=sys.stderr)
                     if print_diff:
                         print(
-                            "\n".join(difflib.unified_diff(
-                                code.splitlines(), formatted_code.splitlines(),
-                                file_path, file_path, lineterm="",
-                            )),
+                            "\n".join(
+                                difflib.unified_diff(
+                                    code.splitlines(),
+                                    formatted_code.splitlines(),
+                                    file_path,
+                                    file_path,
+                                    lineterm="",
+                                )
+                            ),
                             file=sys.stderr,
                         )
                     formattable_files.add(file_path)
@@ -170,7 +189,11 @@ def _check_files_formatting(
             failed_files.add(file_path)
 
     if len(formattable_files) == 0 and len(failed_files) == 0:
-        print("{} file{} would be left unchanged".format(len(files), "s" if len(files) != 1 else ""))
+        print(
+            "{} file{} would be left unchanged".format(
+                len(files), "s" if len(files) != 1 else ""
+            )
+        )
         sys.exit(0)
     elif len(failed_files) > 0 and len(formattable_files) == 0:
         sys.exit(1)
@@ -179,8 +202,10 @@ def _check_files_formatting(
     left_unchanged_num = len(files) - formattable_num
     print(
         "{} file{} would be reformatted, {} file{} would be left unchanged.".format(
-            formattable_num, "s" if formattable_num != 1 else "",
-            left_unchanged_num, "s" if left_unchanged_num != 1 else "",
+            formattable_num,
+            "s" if formattable_num != 1 else "",
+            left_unchanged_num,
+            "s" if left_unchanged_num != 1 else "",
         ),
         file=sys.stderr,
     )
@@ -212,8 +237,10 @@ def _format_files(files: List[str], style: StyleConfig, safety_enabled: bool) ->
     left_unchanged_num = len(files) - reformatted_num
     print(
         "{} file{} reformatted, {} file{} left unchanged.".format(
-            reformatted_num, "s" if reformatted_num != 1 else "",
-            left_unchanged_num, "s" if left_unchanged_num != 1 else "",
+            reformatted_num,
+            "s" if reformatted_num != 1 else "",
+            left_unchanged_num,
+            "s" if left_unchanged_num != 1 else "",
         )
     )
     sys.exit(0 if len(failed_files) == 0 else 1)
@@ -244,11 +271,18 @@ def _format_code(
                         formatted_code=formatted_code,
                         style=style,
                     )
-                except (TreeInvariantViolation, FormattingStabilityViolation, CommentPersistenceViolation):
+                except (
+                    TreeInvariantViolation,
+                    FormattingStabilityViolation,
+                    CommentPersistenceViolation,
+                ):
                     raise
     except lark.exceptions.UnexpectedToken as e:
         success = False
-        print(f"STDIN:\n{lark.exceptions.UnexpectedToken.__doc__ or str(e)}", file=sys.stderr)
+        print(
+            f"STDIN:\n{lark.exceptions.UnexpectedToken.__doc__ or str(e)}",
+            file=sys.stderr,
+        )
     except TreeInvariantViolation as e:
         success = False
         print("Failed to format, formatted code parse tree differs", file=sys.stderr)

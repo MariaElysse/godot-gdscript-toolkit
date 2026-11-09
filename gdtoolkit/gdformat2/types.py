@@ -13,19 +13,23 @@ def is_standalone_comment(child) -> bool:
     as an indent-level sibling (column <= statement_indent_column).
     """
     from lark import Tree, Token
+
     if not isinstance(child, Tree) or child.data != "comment":
         return False
     # Check: standalone comments are typically at column 0 or match container indent
-    meta = getattr(child.meta, 'line', None)
-    col = getattr(child.meta, 'column', None)
-    return True  # All comment nodes in this context are standalone unless proven otherwise
+    meta = getattr(child.meta, "line", None)
+    col = getattr(child.meta, "column", None)
+    return (
+        True  # All comment nodes in this context are standalone unless proven otherwise
+    )
 
 
 def get_comment_text(comment_node) -> str:
     """Extract the text content from a comment tree node."""
     from lark import Tree
+
     if not isinstance(comment_node, Tree):
         return ""
     for child in comment_node.children:
-        return child.value.lstrip('#').strip()  # type: ignore
+        return child.value.lstrip("#").strip()  # type: ignore
     return ""

@@ -46,9 +46,7 @@ class Parser:
     def __init__(self):
         self._directory = os.path.dirname(__file__)
         self._use_grammar_cache = True
-        self._cache_dirpath: str = os.path.join(
-            _get_cache_directory(), "gdtoolkit"
-        )
+        self._cache_dirpath: str = os.path.join(_get_cache_directory(), "gdtoolkit")
         self.indenter = GDScriptIndenter()  # shared postlexer
 
     def parse(self, code: str) -> Tree:
@@ -91,10 +89,12 @@ class Parser:
         )
         callbacks: dict = {}
         callbacks["COMMENT"] = self.indenter.collect_comment
-        options.update({
-            "postlex": self.indenter,
-            "lexer_callbacks": callbacks,
-        })
+        options.update(
+            {
+                "postlex": self.indenter,
+                "lexer_callbacks": callbacks,
+            }
+        )
 
         a_parser = Lark.open(
             grammar_filepath,
@@ -111,9 +111,7 @@ class Parser:
 
     @CachedProperty
     def _comment_parser(self) -> Lark:
-        return self._get_parser(
-            "parser_comments", grammar_filename="comments.lark"
-        )
+        return self._get_parser("parser_comments", grammar_filename="comments.lark")
 
 
 def _rule_name(node) -> str:
@@ -148,20 +146,27 @@ def _merge_inline_class_body_members(tree: Tree) -> None:
             if _rule_name(candidate) == "inner_class":
                 inner = candidate
             elif _rule_name(candidate) == "class_member":
-                inner = next((c for c in candidate.children
-                              if _rule_name(c) == "inner_class"), None)
+                inner = next(
+                    (c for c in candidate.children if _rule_name(c) == "inner_class"),
+                    None,
+                )
             if inner is None:
                 index += 1
                 continue
-            body = next((c for c in inner.children
-                         if _rule_name(c) == "inline_class_body"), None)
+            body = next(
+                (c for c in inner.children if _rule_name(c) == "inline_class_body"),
+                None,
+            )
             if body is None:
                 index += 1
                 continue
             class_line = _start_line(inner)
             while index + 1 < len(children):
                 sibling = children[index + 1]
-                if _rule_name(sibling) != "class_member" or _start_line(sibling) != class_line:
+                if (
+                    _rule_name(sibling) != "class_member"
+                    or _start_line(sibling) != class_line
+                ):
                     break
                 children.pop(index + 1)
                 body.children.append(sibling)

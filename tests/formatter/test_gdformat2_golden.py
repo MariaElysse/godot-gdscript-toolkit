@@ -81,7 +81,7 @@ GDFORMAT2_GUIDE_DIVERGENCES: Dict[str, str] = {
     # the extra space and its own example writes `position.x = 5`.
     "bug_160_multiline_call_chaining": "no space after the dot in a wrapped chain",
     "long_atom_expressions": (
-        "line length: the golden keeps a long `^\"...\"` node path on one 107-column line"
+        'line length: the golden keeps a long `^"..."` node path on one 107-column line'
     ),
     "long_boolean_test_expressions": (
         "line length: the golden keeps a twenty-two-`not` chain on one 104-column line; it also "
@@ -140,9 +140,9 @@ GDFORMAT2_GUIDE_DIVERGENCES: Dict[str, str] = {
     "force_multiline_dict": "a multiline collection packs its items while they fit",
     "simple_function_annotations": "a multiline collection packs its items while they fit",
     "complex_unistatement_lambdas": "a multiline collection packs its items while they fit; "
-                                      "single-line dict brace spacing",
+    "single-line dict brace spacing",
     "long_multistatement_lambdas": "continuation lines indented two levels; "
-                                "multiline trailing comma",
+    "multiline trailing comma",
     "bug_156_trailing_comma_corner_case": "continuation lines indented two levels",
     "long_arithmetic_expression": "continuation lines indented two levels",
     "multiplication_division_remainder_expressions": "continuation lines indented two levels",
@@ -186,19 +186,22 @@ GDFORMAT2_GUIDE_DIVERGENCES: Dict[str, str] = {
 
 def pytest_generate_tests(metafunc):
     this_directory = os.path.dirname(os.path.abspath(__file__))
-    if ("test_name" in metafunc.fixturenames
-            and metafunc.function.__name__ == "test_input_output_pair"):
+    if (
+        "test_name" in metafunc.fixturenames
+        and metafunc.function.__name__ == "test_input_output_pair"
+    ):
         tests_dir = os.path.join(this_directory, DATA_DIR)
-        
+
         # Get all available test names (excluding known exceptions)
         all_test_names = {
-            f.split(".")[0] for f in os.listdir(tests_dir)
+            f.split(".")[0]
+            for f in os.listdir(tests_dir)
             if f.endswith(".in.gd")
             and f.split(".")[0] not in GDFORMAT2_EXCEPTIONS
             and f.split(".")[0] not in GDFORMAT2_STYLE_GUIDE_DIVERGENCES
             and f.split(".")[0] not in GDFORMAT2_GUIDE_DIVERGENCES
         }
-        
+
         metafunc.parametrize(
             "test_name",
             sorted(all_test_names),
@@ -272,12 +275,18 @@ def test_style_guide_divergence(test_name):
     starts matching should be removed from GDFORMAT2_STYLE_GUIDE_DIVERGENCES.
     """
     this_dir = os.path.dirname(os.path.abspath(__file__))
-    with open(os.path.join(this_dir, DATA_DIR, f"{test_name}.in.gd"), encoding="utf-8") as f:
+    with open(
+        os.path.join(this_dir, DATA_DIR, f"{test_name}.in.gd"), encoding="utf-8"
+    ) as f:
         input_code = f.read()
-    with open(os.path.join(this_dir, DATA_DIR, f"{test_name}.out.gd"), encoding="utf-8") as f:
+    with open(
+        os.path.join(this_dir, DATA_DIR, f"{test_name}.out.gd"), encoding="utf-8"
+    ) as f:
         expected_output = f.read()
 
-    formatted = format_code(p.parse(input_code), StyleConfig(line_length=MAX_LINE_LENGTH))
+    formatted = format_code(
+        p.parse(input_code), StyleConfig(line_length=MAX_LINE_LENGTH)
+    )
 
     reason = GDFORMAT2_STYLE_GUIDE_DIVERGENCES[test_name]
     assert formatted != expected_output, (
@@ -407,12 +416,18 @@ def test_guide_divergence(test_name):
     the guide allows is collapsed, and it never has more over-long lines than the golden.
     """
     this_dir = os.path.dirname(os.path.abspath(__file__))
-    with open(os.path.join(this_dir, DATA_DIR, f"{test_name}.in.gd"), encoding="utf-8") as f:
+    with open(
+        os.path.join(this_dir, DATA_DIR, f"{test_name}.in.gd"), encoding="utf-8"
+    ) as f:
         input_code = f.read()
-    with open(os.path.join(this_dir, DATA_DIR, f"{test_name}.out.gd"), encoding="utf-8") as f:
+    with open(
+        os.path.join(this_dir, DATA_DIR, f"{test_name}.out.gd"), encoding="utf-8"
+    ) as f:
         expected_output = f.read()
 
-    formatted = format_code(p.parse(input_code), StyleConfig(line_length=MAX_LINE_LENGTH))
+    formatted = format_code(
+        p.parse(input_code), StyleConfig(line_length=MAX_LINE_LENGTH)
+    )
     reason = GDFORMAT2_GUIDE_DIVERGENCES[test_name]
 
     assert formatted != expected_output, (
@@ -423,7 +438,9 @@ def test_guide_divergence(test_name):
         f"{test_name} differs only by what `_style_guide_canon` absorbs, so it belongs in "
         f"GDFORMAT2_STYLE_GUIDE_DIVERGENCES rather than here ({reason})."
     )
-    assert _guide_collapse(_guide_code(formatted)) == _guide_collapse(_guide_code(expected_output)), (
+    assert _guide_collapse(_guide_code(formatted)) == _guide_collapse(
+        _guide_code(expected_output)
+    ), (
         f"{test_name} diverges by more than the guide's formatting rules allow ({reason}):\n"
         f"  expected:  {_guide_collapse(_guide_code(expected_output))[:220]}\n"
         f"  formatted: {_guide_collapse(_guide_code(formatted))[:220]}"
@@ -431,7 +448,9 @@ def test_guide_divergence(test_name):
     # `_guide_collapse` drops the `extends` clause, because the guide moves it between the
     # class header and the class body; the targets are compared on their own so that a changed
     # base class is still a failure.
-    assert _guide_extends(_guide_code(formatted)) == _guide_extends(_guide_code(expected_output)), (
+    assert _guide_extends(_guide_code(formatted)) == _guide_extends(
+        _guide_code(expected_output)
+    ), (
         f"{test_name} changes an `extends` target ({reason}): golden "
         f"{_guide_extends(_guide_code(expected_output))}, formatted "
         f"{_guide_extends(_guide_code(formatted))}."
@@ -443,7 +462,9 @@ def test_guide_divergence(test_name):
     )
 
     def over_long(text: str):
-        return [line for line in text.splitlines() if _display_width(line) > MAX_LINE_LENGTH]
+        return [
+            line for line in text.splitlines() if _display_width(line) > MAX_LINE_LENGTH
+        ]
 
     assert len(over_long(formatted)) <= len(over_long(expected_output)), (
         f"{test_name} has more over-long lines than the golden ({reason}): golden "
@@ -452,154 +473,184 @@ def test_guide_divergence(test_name):
 
 
 # Basic formatting tests adapted from old test_basics.py
-@pytest.mark.parametrize("input_code,expected_output", [
-    ("", ""),
-    ("pass", "pass\n"),
-])
+@pytest.mark.parametrize(
+    "input_code,expected_output",
+    [
+        ("", ""),
+        ("pass", "pass\n"),
+    ],
+)
 def test_formatting_basic(input_code: str, expected_output: str):
     format_and_compare(input_code, expected_output)
 
 
 def test_indentation_tabs():
     """Test that default formatting uses tabs."""
-    input_code = "\n".join([
-        "extends Node",
-        "func foo():",
-        "  if True:",
-        "    pass",
-        "  if False:",
-        "    while True:",
-        "      pass",
-    ])
-    expected_output = "\n".join([
-        "extends Node",
-        "",
-        "",
-        "func foo():",
-        "\tif True:",
-        "\t\tpass",
-        "\tif False:",
-        "\t\twhile True:",
-        "\t\t\tpass",
-        "",
-    ])
+    input_code = "\n".join(
+        [
+            "extends Node",
+            "func foo():",
+            "  if True:",
+            "    pass",
+            "  if False:",
+            "    while True:",
+            "      pass",
+        ]
+    )
+    expected_output = "\n".join(
+        [
+            "extends Node",
+            "",
+            "",
+            "func foo():",
+            "\tif True:",
+            "\t\tpass",
+            "\tif False:",
+            "\t\twhile True:",
+            "\t\t\tpass",
+            "",
+        ]
+    )
     format_and_compare(input_code, expected_output)
 
 
 def test_indentation_spaces_3():
     """Test that spaces-based indentation works with custom tab size."""
-    input_code = "\n".join([
-        "extends Node",
-        "func foo():",
-        "  if True:",
-        "    pass",
-        "  if False:",
-        "    while True:",
-        "      pass",
-    ])
-    expected_output = "\n".join([
-        "extends Node",
-        "",
-        "",
-        "func foo():",
-        "   if True:",
-        "      pass",
-        "   if False:",
-        "      while True:",
-        "         pass",
-        "",
-    ])
+    input_code = "\n".join(
+        [
+            "extends Node",
+            "func foo():",
+            "  if True:",
+            "    pass",
+            "  if False:",
+            "    while True:",
+            "      pass",
+        ]
+    )
+    expected_output = "\n".join(
+        [
+            "extends Node",
+            "",
+            "",
+            "func foo():",
+            "   if True:",
+            "      pass",
+            "   if False:",
+            "      while True:",
+            "         pass",
+            "",
+        ]
+    )
     format_and_compare(input_code, expected_output, spaces_for_indent=3)
 
 
-@pytest.mark.parametrize("literal,expected", [
-    # The guide's own examples: decimal grouped in threes, hexadecimal and binary in fours,
-    # and `12345` left alone because a grouping there would need only one separator.
-    ("1_234_567_890", "1_234_567_890"),
-    ("1234567890", "1_234_567_890"),
-    ("0xffff_f8f8_0000", "0xffff_f8f8_0000"),
-    ("0xfffff8f80000", "0xffff_f8f8_0000"),
-    ("0x0f0f1e1e2d2d", "0x0f0f_1e1e_2d2d"),
-    ("0b1101_0010_1010", "0b1101_0010_1010"),
-    ("0b110100101010", "0b1101_0010_1010"),
-    ("12345", "12345"),
-    # Its Bad example: a separator that makes nothing more readable goes.
-    ("12_345", "12345"),
-    # The threshold differs by base. A decimal literal is grouped from a million up, the cut
-    # the guide's note draws (`1000000` needs a grouping, `999999` does not), and the short
-    # leading group that produces is what thousands-grouping looks like.
-    ("1000000", "1_000_000"),
-    ("999999", "999999"),
-    # Hexadecimal and binary are grouped in fours, but only when the digits divide evenly into
-    # fours - grouping six from the right would split them 2-4 and contradict the guide, whose
-    # own `0xfb8c0b` is written with no separator while `0xffff_f8f8_0000` is grouped. So an
-    # eight-digit value keeps its separator and anything shorter loses it.
-    ("0xffff_ffff", "0xffff_ffff"),
-    ("0xffffffff", "0xffff_ffff"),
-    ("0xff_99_00", "0xff9900"),
-    ("0b11_11_11", "0b111111"),
-    ("0b0101111", "0b0101111"),
-    ("0xaf01", "0xaf01"),
-    ("0x9ff", "0x9ff"),
-    # A fraction and an exponent are not magnitudes, so they carry no grouping, and the
-    # float keeps its trailing zero.
-    ("1_000.000", "1000.000"),
-    ("1.5_000", "1.5000"),
-    ("1e1_0", "1e10"),
-    ("13.", "13.0"),
-    (".5", "0.5"),
-    # Hexadecimal digits are lower-cased whatever the grouping does.
-    ("0xAfA01", "0xafa01"),
-    ("0xFB8C0B", "0xfb8c0b"),
-])
+@pytest.mark.parametrize(
+    "literal,expected",
+    [
+        # The guide's own examples: decimal grouped in threes, hexadecimal and binary in fours,
+        # and `12345` left alone because a grouping there would need only one separator.
+        ("1_234_567_890", "1_234_567_890"),
+        ("1234567890", "1_234_567_890"),
+        ("0xffff_f8f8_0000", "0xffff_f8f8_0000"),
+        ("0xfffff8f80000", "0xffff_f8f8_0000"),
+        ("0x0f0f1e1e2d2d", "0x0f0f_1e1e_2d2d"),
+        ("0b1101_0010_1010", "0b1101_0010_1010"),
+        ("0b110100101010", "0b1101_0010_1010"),
+        ("12345", "12345"),
+        # Its Bad example: a separator that makes nothing more readable goes.
+        ("12_345", "12345"),
+        # The threshold differs by base. A decimal literal is grouped from a million up, the cut
+        # the guide's note draws (`1000000` needs a grouping, `999999` does not), and the short
+        # leading group that produces is what thousands-grouping looks like.
+        ("1000000", "1_000_000"),
+        ("999999", "999999"),
+        # Hexadecimal and binary are grouped in fours, but only when the digits divide evenly into
+        # fours - grouping six from the right would split them 2-4 and contradict the guide, whose
+        # own `0xfb8c0b` is written with no separator while `0xffff_f8f8_0000` is grouped. So an
+        # eight-digit value keeps its separator and anything shorter loses it.
+        ("0xffff_ffff", "0xffff_ffff"),
+        ("0xffffffff", "0xffff_ffff"),
+        ("0xff_99_00", "0xff9900"),
+        ("0b11_11_11", "0b111111"),
+        ("0b0101111", "0b0101111"),
+        ("0xaf01", "0xaf01"),
+        ("0x9ff", "0x9ff"),
+        # A fraction and an exponent are not magnitudes, so they carry no grouping, and the
+        # float keeps its trailing zero.
+        ("1_000.000", "1000.000"),
+        ("1.5_000", "1.5000"),
+        ("1e1_0", "1e10"),
+        ("13.", "13.0"),
+        (".5", "0.5"),
+        # Hexadecimal digits are lower-cased whatever the grouping does.
+        ("0xAfA01", "0xafa01"),
+        ("0xFB8C0B", "0xfb8c0b"),
+    ],
+)
 def test_number_normalization(literal: str, expected: str):
     """The style guide's underscore rule, which the goldens cannot encode (they keep the
     author's separators verbatim)."""
     from gdtoolkit.gdformat2.expression_to_str import normalize_number
+
     assert normalize_number(literal) == expected
 
 
-@pytest.mark.parametrize("source,expected_line", [
-    # A group that spans a whole slot is redundant, so it comes off: the guide asks to avoid
-    # parentheses that are not needed for order of operations or for wrapping over multiple
-    # lines, and nothing outside the group can bind to what is inside it.
-    ("func f():\n\tvar x = (1 + 2)\n", "\tvar x = 1 + 2"),
-    ("func f():\n\tvar x: int = (1 + 2)\n", "\tvar x: int = 1 + 2"),
-    ("func f():\n\tconst C = (1 + 2)\n", "\tconst C = 1 + 2"),
-    ("func f():\n\tx = (1 + 2)\n", "\tx = 1 + 2"),
-    ("func f():\n\tx += (1 + 2)\n", "\tx += 1 + 2"),
-    ("func f():\n\tvar x = ((1 + 2))\n", "\tvar x = 1 + 2"),
-    ("func f(a):\n\tif (a + 1):\n\t\tpass\n", "\tif a + 1:"),
-    ("func f(a):\n\tif ((a and b)):\n\t\tpass\n", "\tif a and b:"),
-    ("func f(a):\n\twhile (a + 1):\n\t\tpass\n", "\twhile a + 1:"),
-    ("func f():\n\tfor i in (range(3) + x):\n\t\tpass\n", "\tfor i in range(3) + x:"),
-    ("func f():\n\tassert((1 + 2))\n", "\tassert(1 + 2)"),
-    ("func f(x = (1 + 2)):\n\tpass\n", "func f(x = 1 + 2):"),
-    ("func f():\n\tmatch (x + 1):\n\t\t1:\n\t\t\tpass\n", "\tmatch x + 1:"),
-    ("func f():\n\treturn (a or b)\n", "\treturn a or b"),
-])
+@pytest.mark.parametrize(
+    "source,expected_line",
+    [
+        # A group that spans a whole slot is redundant, so it comes off: the guide asks to avoid
+        # parentheses that are not needed for order of operations or for wrapping over multiple
+        # lines, and nothing outside the group can bind to what is inside it.
+        ("func f():\n\tvar x = (1 + 2)\n", "\tvar x = 1 + 2"),
+        ("func f():\n\tvar x: int = (1 + 2)\n", "\tvar x: int = 1 + 2"),
+        ("func f():\n\tconst C = (1 + 2)\n", "\tconst C = 1 + 2"),
+        ("func f():\n\tx = (1 + 2)\n", "\tx = 1 + 2"),
+        ("func f():\n\tx += (1 + 2)\n", "\tx += 1 + 2"),
+        ("func f():\n\tvar x = ((1 + 2))\n", "\tvar x = 1 + 2"),
+        ("func f(a):\n\tif (a + 1):\n\t\tpass\n", "\tif a + 1:"),
+        ("func f(a):\n\tif ((a and b)):\n\t\tpass\n", "\tif a and b:"),
+        ("func f(a):\n\twhile (a + 1):\n\t\tpass\n", "\twhile a + 1:"),
+        (
+            "func f():\n\tfor i in (range(3) + x):\n\t\tpass\n",
+            "\tfor i in range(3) + x:",
+        ),
+        ("func f():\n\tassert((1 + 2))\n", "\tassert(1 + 2)"),
+        ("func f(x = (1 + 2)):\n\tpass\n", "func f(x = 1 + 2):"),
+        ("func f():\n\tmatch (x + 1):\n\t\t1:\n\t\t\tpass\n", "\tmatch x + 1:"),
+        ("func f():\n\treturn (a or b)\n", "\treturn a or b"),
+    ],
+)
 def test_unnecessary_parentheses_removed(source: str, expected_line: str):
     """The guide's "avoid unnecessary parentheses", applied to a whole slot."""
     formatted = format_code(p.parse(source), StyleConfig(line_length=100))
     assert expected_line in formatted.splitlines(), formatted
 
 
-@pytest.mark.parametrize("source,kept_line", [
-    # The group is an operand of an operator that binds looser, so it decides the result:
-    # `(1 + 2) * 3` is not `1 + 2 * 3`, and `-(1 + 2)` is not `-1 + 2`.
-    ("func f():\n\tvar x = (1 + 2) * 3\n", "\tvar x = (1 + 2) * 3"),
-    ("func f():\n\tvar x = -(1 + 2)\n", "\tvar x = -(1 + 2)"),
-    # A boolean group is how the guide's own example clears an ambiguity.
-    ("func f(a):\n\tif (a and b) or not c:\n\t\tpass\n", "\tif (a and b) or not c:"),
-    # `as` and `is` take their whole left operand, so the group under one is load-bearing.
-    ("func f():\n\tvar x = (a or b) as int\n", "\tvar x = (a or b) as int"),
-    ("func f():\n\tvar x = (a or b) is int\n", "\tvar x = (a or b) is int"),
-    # A ternary binds looser than the cast too, so `(a if b else c) as int` must not become
-    # `a if b else c as int`, which casts only the `c` and re-reads as a different program.
-    ("func f():\n\tvar x = (a if b else c) as int\n", "\tvar x = (a if b else c) as int"),
-    # A match pattern is not a value slot: `(1):` is a pattern group.
-    ("func f(x):\n\tmatch x:\n\t\t(1):\n\t\t\tpass\n", "\t\t(1):"),
-])
+@pytest.mark.parametrize(
+    "source,kept_line",
+    [
+        # The group is an operand of an operator that binds looser, so it decides the result:
+        # `(1 + 2) * 3` is not `1 + 2 * 3`, and `-(1 + 2)` is not `-1 + 2`.
+        ("func f():\n\tvar x = (1 + 2) * 3\n", "\tvar x = (1 + 2) * 3"),
+        ("func f():\n\tvar x = -(1 + 2)\n", "\tvar x = -(1 + 2)"),
+        # A boolean group is how the guide's own example clears an ambiguity.
+        (
+            "func f(a):\n\tif (a and b) or not c:\n\t\tpass\n",
+            "\tif (a and b) or not c:",
+        ),
+        # `as` and `is` take their whole left operand, so the group under one is load-bearing.
+        ("func f():\n\tvar x = (a or b) as int\n", "\tvar x = (a or b) as int"),
+        ("func f():\n\tvar x = (a or b) is int\n", "\tvar x = (a or b) is int"),
+        # A ternary binds looser than the cast too, so `(a if b else c) as int` must not become
+        # `a if b else c as int`, which casts only the `c` and re-reads as a different program.
+        (
+            "func f():\n\tvar x = (a if b else c) as int\n",
+            "\tvar x = (a if b else c) as int",
+        ),
+        # A match pattern is not a value slot: `(1):` is a pattern group.
+        ("func f(x):\n\tmatch x:\n\t\t(1):\n\t\t\tpass\n", "\t\t(1):"),
+    ],
+)
 def test_necessary_parentheses_kept(source: str, kept_line: str):
     """Parentheses the guide allows - for order of operations, or as a pattern - survive."""
     formatted = format_code(p.parse(source), StyleConfig(line_length=100))
@@ -625,21 +676,24 @@ def test_wrapping_parentheses_kept():
 
 
 # Comment preservation tests (verified working independently)
-@pytest.mark.parametrize("input_code", [
-    """# Header comment
+@pytest.mark.parametrize(
+    "input_code",
+    [
+        """# Header comment
 var x : int = 42 # inline after var
 func foo():
     # func body comment
     pass""",
-    
-    """# File doc
+        """# File doc
 class MyNode:
     var a: int # member comment
     func _ready():
         # in function
         pass""",
-])
+    ],
+)
 def test_comment_persistence(input_code: str):
     """Verify comments survive gdformat2 formatting."""
     from .common_gdformat2 import test_comment_persistence as tc
+
     tc(input_code, "")

@@ -57,18 +57,13 @@ KNOWN_NON_IDEMPOTENT = {}
 # body becomes a block, so a comment trailing it is attached inside it; a long lambda's body is
 # emitted as a call path that re-parses as a different call node.
 KNOWN_TREE_INVARIANT_DIVERGENCES = {
-    "inline_properties":
-        "an inline accessor list is laid out one accessor per line, which re-parses as the "
-        "block form (`property` + `property_accessor_line`) instead of `untitled_property`",
-    "inline_properties_w_comments":
-        "as `inline_properties`, with the accessor list's own comments",
-    "multiline_properties_w_comments":
-        "an accessor's trailing comment is emitted at the scope its column names, one level "
-        "shallower or deeper than it was written",
-    "inline_lambdas_w_comments":
-        "a comment trailing an inline lambda's block body is attached inside the body",
-    "long_unistatement_lambdas":
-        "a long lambda's body is emitted as a call path that re-parses as a different call node",
+    "inline_properties": "an inline accessor list is laid out one accessor per line, which re-parses as the "
+    "block form (`property` + `property_accessor_line`) instead of `untitled_property`",
+    "inline_properties_w_comments": "as `inline_properties`, with the accessor list's own comments",
+    "multiline_properties_w_comments": "an accessor's trailing comment is emitted at the scope its column names, one level "
+    "shallower or deeper than it was written",
+    "inline_lambdas_w_comments": "a comment trailing an inline lambda's block body is attached inside the body",
+    "long_unistatement_lambdas": "a long lambda's body is emitted as a call path that re-parses as a different call node",
 }
 
 
@@ -85,9 +80,10 @@ def formatted():
     return prepared
 
 
-@pytest.mark.parametrize("name", sorted(
-    path.name for path in FIXTURES.glob("*.in.gd") if path.name not in SKIP
-))
+@pytest.mark.parametrize(
+    "name",
+    sorted(path.name for path in FIXTURES.glob("*.in.gd") if path.name not in SKIP),
+)
 def test_formatting_is_stable(name, formatted):
     """Running the formatter on its own output changes nothing, or the change is recorded.
 
@@ -105,18 +101,20 @@ def test_formatting_is_stable(name, formatted):
         check_formatting_stability(once, config)
 
 
-@pytest.mark.parametrize("name", sorted(
-    path.name for path in FIXTURES.glob("*.in.gd") if path.name not in SKIP
-))
+@pytest.mark.parametrize(
+    "name",
+    sorted(path.name for path in FIXTURES.glob("*.in.gd") if path.name not in SKIP),
+)
 def test_comments_survive_formatting(name, formatted):
     """Every comment in the input is still there afterwards."""
     tree, once = formatted[name]
     check_comment_persistence(tree, once)
 
 
-@pytest.mark.parametrize("name", sorted(
-    path.name for path in FIXTURES.glob("*.in.gd") if path.name not in SKIP
-))
+@pytest.mark.parametrize(
+    "name",
+    sorted(path.name for path in FIXTURES.glob("*.in.gd") if path.name not in SKIP),
+)
 def test_tree_is_invariant(name, formatted):
     """The output re-parses to the same program, once the guide's reshaping is accounted for.
 

@@ -23,8 +23,9 @@ def collection_indent(indent_string: str) -> str:
     return indent_string + "\t"
 
 
-def continuation_indent_for(indent_string: str, content_width: int, limit: int,
-                            tab_size: int = 4) -> str:
+def continuation_indent_for(
+    indent_string: str, content_width: int, limit: int, tab_size: int = 4
+) -> str:
     """The continuation indent for a line `content_width` wide, one level when two would overflow.
 
     The guide asks for two levels on a continuation line and also to keep every line under the
@@ -51,22 +52,24 @@ def _strip_primary_parens(expression) -> object:
     expression; otherwise return it unchanged."""
     while isinstance(expression, Tree):
         raw = expression.data
-        d = str(getattr(raw, 'value', raw)).lower()
-        if d != 'primary':
+        d = str(getattr(raw, "value", raw)).lower()
+        if d != "primary":
             break
-        children = [c for c in getattr(expression, 'children', []) if c is not None]
-        if (len(children) >= 3
-                and isinstance(children[0], Token)
-                and str(getattr(children[0], 'type', '')).upper() == 'PARENTHESIS_OPEN'
-                and isinstance(children[-1], Token)
-                and str(getattr(children[-1], 'type', '')).upper() == 'PARENTHESIS_CLOSE'):
+        children = [c for c in getattr(expression, "children", []) if c is not None]
+        if (
+            len(children) >= 3
+            and isinstance(children[0], Token)
+            and str(getattr(children[0], "type", "")).upper() == "PARENTHESIS_OPEN"
+            and isinstance(children[-1], Token)
+            and str(getattr(children[-1], "type", "")).upper() == "PARENTHESIS_CLOSE"
+        ):
             expression = children[1]
             continue
         break
     return expression
 
 
-_WRAPPER_DATA = ('assignment', 'cast', 'ternary', 'type_test')
+_WRAPPER_DATA = ("assignment", "cast", "ternary", "type_test")
 
 
 def strip_wrapped_outer_parentheses(expression) -> object:
@@ -92,7 +95,7 @@ def _strip_one_wrapper_paren_layer(expression) -> object:
     if not isinstance(expression, Tree):
         return expression
     raw = expression.data
-    d = str(getattr(raw, 'value', raw)).lower()
+    d = str(getattr(raw, "value", raw)).lower()
     if d in _WRAPPER_DATA:
         # A wrapper is pass-through only when it carries nothing else. The grammar wraps every
         # expression in assignment/cast/ternary/type_test, and those scaffolding layers have a
@@ -101,22 +104,24 @@ def _strip_one_wrapper_paren_layer(expression) -> object:
         # operand: stripping `(a or b) as int` to `a or b as int` re-binds the `or` to the
         # second operand, so it must not happen. The same goes for a ternary with its condition
         # or an assignment with its `=`.
-        non_none = [c for c in getattr(expression, 'children', []) if c is not None]
+        non_none = [c for c in getattr(expression, "children", []) if c is not None]
         if len(non_none) != 1 or not isinstance(non_none[0], Tree):
             return expression
         new_c = _strip_one_wrapper_paren_layer(non_none[0])
         if new_c is non_none[0]:
             return expression
-        children = list(getattr(expression, 'children', []))
+        children = list(getattr(expression, "children", []))
         for i, c in enumerate(children):
             if c is non_none[0]:
                 children[i] = new_c
                 break
-        return Tree(expression.data, children, getattr(expression, 'meta', None))
+        return Tree(expression.data, children, getattr(expression, "meta", None))
     return _strip_primary_parens(expression)
 
 
-def strip_slot_parentheses(expression, prefix_text: str, indent_string: str, style) -> object:
+def strip_slot_parentheses(
+    expression, prefix_text: str, indent_string: str, style
+) -> object:
     """Strip a redundant paren group that spans a whole slot, e.g. `var x = (1 + 2)`.
 
     Only when the value still fits on one line without the group. The guide asks to avoid
@@ -136,6 +141,7 @@ def strip_slot_parentheses(expression, prefix_text: str, indent_string: str, sty
         return expression
     from .expression import _is_forced_multiline
     from .expression_to_str import expression_to_str
+
     if _is_forced_multiline(stripped, style):
         return expression
     try:
@@ -143,39 +149,55 @@ def strip_slot_parentheses(expression, prefix_text: str, indent_string: str, sty
     except Exception:
         return expression
     limit = style.line_length if style else 100
-    if len(f"{indent_string}{prefix_text}{text}".replace('\t', '    ')) > limit:
+    if len(f"{indent_string}{prefix_text}{text}".replace("\t", "    ")) > limit:
         return expression
     return stripped
 
 
 def is_foldable(expression) -> bool:
     non_foldable = [
-        "string", "rstring", "get_node", "node_path", "string_name",
-        "unique_node_path", "signal_arg_typed", "signal_arg_regular",
-        "non_foldable_dot_chain", "var_capture_pattern", "etc_pattern",
+        "string",
+        "rstring",
+        "get_node",
+        "node_path",
+        "string_name",
+        "unique_node_path",
+        "signal_arg_typed",
+        "signal_arg_regular",
+        "non_foldable_dot_chain",
+        "var_capture_pattern",
+        "etc_pattern",
         "wildcard_pattern",
     ]
     if _is_multiline_string(expression):
         return True
     if isinstance(expression, Token):
         return False
-    data = str(expression.data) if not hasattr(expression.data, 'value') else expression.data.value  # type: ignore
+    data = str(expression.data) if not hasattr(expression.data, "value") else expression.data.value  # type: ignore
     return data not in non_foldable
 
 
 def has_trailing_comma(expression) -> bool:
     """Detect trailing comma in arrays/dicts for both old and new grammar."""
-    if not isinstance(expression, Tree) or len(getattr(expression, 'children', [])) == 0:
+    if (
+        not isinstance(expression, Tree)
+        or len(getattr(expression, "children", [])) == 0
+    ):
         return False
-    last = getattr(expression, 'children', [None])[-1]
+    last = getattr(expression, "children", [None])[-1]
     # Check for trailing comma as a tree node (old grammar)
     if isinstance(last, Tree) and _tree_data_str(last) == "trailing_comma":
         return True
     # Also check for plain COMMA token at the end (new grammar direct children)
-    non_none_children = [c for c in getattr(expression, 'children', []) if c is not None]
+    non_none_children = [
+        c for c in getattr(expression, "children", []) if c is not None
+    ]
     if non_none_children:
         last_non_none = non_none_children[-1]
-        if isinstance(last_non_none, Token) and str(getattr(last_non_none, 'type', '')).upper() == "COMMA":
+        if (
+            isinstance(last_non_none, Token)
+            and str(getattr(last_non_none, "type", "")).upper() == "COMMA"
+        ):
             return True
 
     # For new grammar array_literal/dict_literal/enum_body, check inside elements/subtree.
@@ -184,17 +206,26 @@ def has_trailing_comma(expression) -> bool:
     #   elements      -> [expr1, COMMA, expr2, COMMA, ..., exprN, COMMA, None]
     # Match patterns use array_pattern_items / dict_pattern_items instead, and mirror
     # the literals, so they need the same trailing-comma detection.
-    for child in getattr(expression, 'children', []):
+    for child in getattr(expression, "children", []):
         if isinstance(child, Tree):
             d = _tree_data_str(child)
-            if d in ('elements', 'dict_entries',
-                     'array_pattern_items', 'dict_pattern_items'):
-                non_none_elems = [c for c in getattr(child, 'children', []) if c is not None]
+            if d in (
+                "elements",
+                "dict_entries",
+                "array_pattern_items",
+                "dict_pattern_items",
+            ):
+                non_none_elems = [
+                    c for c in getattr(child, "children", []) if c is not None
+                ]
                 if len(non_none_elems) >= 2:
                     last_elem = non_none_elems[-1]
                     second_last = non_none_elems[-2]
                     # Trailing comma pattern: ..., COMMA, None (last elem before trailing comma is COMMA)
-                    if isinstance(last_elem, Token) and str(getattr(last_elem, 'type', '')).upper() == "COMMA":
+                    if (
+                        isinstance(last_elem, Token)
+                        and str(getattr(last_elem, "type", "")).upper() == "COMMA"
+                    ):
                         return True
                     # Alternative: last two are COMMA, expression - check if last is also COMMA
                     # This handles the case where trailing comma sits directly after elements
@@ -218,16 +249,17 @@ def is_any_parentheses(expression) -> bool:
 def _is_multiline_string(expression) -> bool:
     if not isinstance(expression, Tree):
         return False
-    data_str = str(expression.data).lower() if hasattr(expression.data, 'value') else expression.data  # type: ignore
+    data_str = str(expression.data).lower() if hasattr(expression.data, "value") else expression.data  # type: ignore
     if data_str != "string":
         return False
-    first = getattr(expression, 'children', [None])[0]
+    first = getattr(expression, "children", [None])[0]
     return isinstance(first, Token) and first.type == "LONG_STRING"  # type: ignore
 
 
 def _tree_data_str(node):
     from lark import Tree as LarkTree
+
     if isinstance(node, LarkTree):
         d = node.data
-        return str(d) if not hasattr(d, 'value') else d.value  # type: ignore
+        return str(d) if not hasattr(d, "value") else d.value  # type: ignore
     return ""
