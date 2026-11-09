@@ -196,13 +196,15 @@ def _getattr_call_to_str(call: Tree) -> str:
 
 
 def _arguments_to_str(arguments: List[Node]) -> str:
-    return ", ".join(
-        [
-            standalone_expression_to_str(argument)
-            for argument in arguments
-            if not is_any_parentheses(argument) and not is_any_comma(argument)
-        ]
-    )
+    elements = [
+        standalone_expression_to_str(argument)
+        for argument in arguments
+        if not is_any_parentheses(argument) and not is_any_comma(argument)
+    ]
+    # keep trailing comma (as done for arrays/annotations): erasing it here
+    # breaks the formatting safety invariant (trailing_comma is a tree node)
+    trailing_comma = "," if len(arguments) > 0 and is_any_comma(arguments[-1]) else ""
+    return ", ".join(elements) + trailing_comma
 
 
 def _annotation_to_str(annotation: Tree) -> str:
