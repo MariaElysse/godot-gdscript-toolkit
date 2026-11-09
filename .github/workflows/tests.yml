@@ -25,4 +25,4 @@ jobs:
         run: python -m pip install --upgrade setuptools pip wheel tox
 
       - name: Run tox
-        run: tox
+        run: tox -e py3

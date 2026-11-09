@@ -1,0 +1,31 @@
+name: Checks
+
+# Advisory only: gdformat2's lint/format/mypy debt is still being paid down
+# (see docs/adr CI State). These jobs report status without blocking the
+# Tests workflow.
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    strategy:
+      fail-fast: false
+      matrix:
+        tox-env: [lint, format, mypy]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade setuptools pip wheel tox
+
+      - name: Run tox ${{ matrix.tox-env }}
+        run: tox -e ${{ matrix.tox-env }}
