@@ -568,7 +568,7 @@ def _format_comma_separated_list(
 
     # Add trailing comma and close
     last_indent = "    " if "\t" not in indent_string else "\t\t"
-    text = f"\n{last_indent}]  {expression_context.suffix_string}"  # type: ignore (generic)
+    text = f"\n{last_indent}]  {expression_context.suffix_string}"  # type: ignore
     return lines
 
 
