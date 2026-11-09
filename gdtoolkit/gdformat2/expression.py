@@ -3,12 +3,11 @@
 Adapted from original gdtoolkit/formatter/expression.py to use tree-based
 comment handling instead of line-indexed arrays.
 """
-from typing import Dict, Callable, List, Optional
+from typing import List, Optional
 
 from lark import Tree, Token
-from lark.tree import Meta
 
-from ..common.utils import get_line, get_end_line
+from ..common.utils import get_end_line
 from .context import ExpressionContext
 from .expression_utils import (
     collection_indent,
@@ -16,7 +15,7 @@ from .expression_utils import (
     continuation_indent_for,
 )
 from .style_config import StyleConfig
-from .types import FormattedLines, Outcome
+from .types import FormattedLines
 
 
 def _extract_all_tokens(node, names: List[str]) -> None:
@@ -71,9 +70,10 @@ def format_expression(
         Tuple of (formatted_lines, end_line_number)
     """
     if isinstance(expression, Token):
-        return _format_standalone_expression(expression, expression_context, indent_string, style), get_end_line_safe(expression)  # type: ignore
-
-    from .expression_to_str import expression_to_str as ets
+        formatted = _format_standalone_expression(  # type: ignore
+            expression, expression_context, indent_string, style
+        )
+        return formatted, get_end_line_safe(expression)
 
     # For trees that produce their full output via expression_to_str (like type annotations,
     # enum bodies, assignment wrappers with maybe_placeholders), use the whole tree.
@@ -149,7 +149,11 @@ def _is_foldable(expression) -> bool:
         return True
     if isinstance(expression, Token):
         return False
-    data = str(expression.data) if not hasattr(expression.data, "value") else expression.data.value  # type: ignore
+    data = (
+        str(expression.data)
+        if not hasattr(expression.data, "value")
+        else expression.data.value  # type: ignore
+    )
     return data not in non_foldable_types
 
 
@@ -174,14 +178,13 @@ def _has_trailing_comma_in_elements(tree_node: Tree) -> bool:
     [expr1, COMMA, expr2, COMMA, ..., exprN]. A trailing comma adds one more
     COMMA token after the last expression.
     """
-    from lark import Token
-
     for child in getattr(tree_node, "children", []):
         if isinstance(child, Tree):
             d = str(getattr(child.data, "value", None)) or str(child.data)
             if d == "elements":
                 elems = list(child.children)
-                # Count expressions vs commas: N elements should have N-1 commas without trailing comma
+                # Count expressions vs commas: N elements should have N-1
+                # commas without trailing comma
                 expr_count = sum(1 for e in elems if isinstance(e, Tree))
                 comma_count = sum(
                     1
@@ -278,14 +281,12 @@ def _has_inline_forcing_lambda(node, depth=0) -> bool:
     )
 
 
-def _is_forced_multiline(expression, style=None) -> bool:
+def _is_forced_multiline(expression, style=None) -> bool:  # noqa: C901
     """Check if an expression MUST be formatted multiline regardless of line length.
 
     This handles arrays with trailing commas which the legacy formatter always forces
     to multiline, even when they'd fit on one line.
     """
-    from lark import Tree
-
     # A collection carrying a trailing comma ANYWHERE in the expression forces the whole
     # expression multiline (legacy keeps such a collection exploded, e.g.
     # `not 1 in [1] in [true,]`). A lambda body is a separate block, so don't descend
@@ -506,12 +507,14 @@ def _is_forced_multiline(expression, style=None) -> bool:
                             "bit_or",
                             "bit_xor",
                         ):
-                            # Direct additive/arith chain inside subscript - this triggers paren preservation multiline
+                            # Direct additive/arith chain inside subscript -
+                            # this triggers paren preservation multiline
                             return True
                         elif (
                             id2 == "primary"
                         ):  # paren-wrapped expressions (new grammar)
-                            # Check for paren-wrapped additive/arith chains - preserve them multiline
+                            # Check for paren-wrapped additive/arith chains -
+                            # preserve them multiline
                             non_none_inner = [
                                 c
                                 for c in getattr(inner, "children", [])
@@ -524,7 +527,8 @@ def _is_forced_multiline(expression, style=None) -> bool:
                                     if len(non_none_inner) > 1
                                     else non_none_inner[0]
                                 )
-                                # Check if this is an additive/arith chain (preserves readability with parens)
+                                # Check if this is an additive/arith chain
+                                # (preserves readability with parens)
                                 d_ie = str(
                                     getattr(inner_expr.data, "value", None)
                                 ) or str(inner_expr.data)
@@ -558,7 +562,8 @@ def _is_forced_multiline(expression, style=None) -> bool:
                             else:
                                 break
                         else:
-                            # Unknown type - check children anyway (e.g., subscript wrapping other stuff)
+                            # Unknown type - check children anyway (e.g.,
+                            # subscript wrapping other stuff)
                             for ch in getattr(inner, "children", []):
                                 if isinstance(ch, Tree):
                                     inner = ch  # Recurse into child
@@ -594,9 +599,7 @@ def _format_standalone_expression(
 
 
 def get_data_str(node):
-    from lark import Tree as LarkTree
-
-    if isinstance(node, LarkTree):
+    if isinstance(node, Tree):
         d = getattr(getattr(node.data, "value", None), "value", str(node.data))
         return str(d)
     elif hasattr(node, "type"):
@@ -612,14 +615,13 @@ def _format_concrete_expression(
 
     # Keep original data for wrapper handling below; unwrap only when needed
     orig_expression = expression
-    data = get_data_str(orig_expression)
 
     if _is_foldable(expression):
         max_len = style.line_length if style else 100
         single = _format_concrete_expression_to_single_line(
             expression, expression_context, indent_string
         )
-        line_no, line_text = single[0]
+        _, line_text = single[0]
         display_length = len(line_text.replace("\t", "    "))
         has_comments = _has_standalone_comment_children(expression)  # type: ignore
         forced_multiline = (
@@ -721,7 +723,11 @@ def _format_concrete_expression(
 
 def _format_token_as_line(token: Token, ec: ExpressionContext, indent) -> tuple:
     """Format a single token as a line."""
-    prefix = f"{ec.prefix_string}{token.value}" if isinstance(ec.prefix_string, str) else ""  # type: ignore
+    prefix = (
+        f"{ec.prefix_string}{token.value}"
+        if isinstance(ec.prefix_string, str)
+        else ""  # type: ignore
+    )
     suffix = ec.suffix_string if isinstance(ec.suffix_string, str) else ""
     return (ec.prefix_line, f"{indent}{prefix}{suffix}")
 
@@ -732,12 +738,22 @@ def _format_concrete_expression_to_single_line(
     from .expression_to_str import expression_to_str as _etostr
 
     if isinstance(expression, Token):
-        text = f"{expression_context.prefix_string}{expression.value}{expression_context.suffix_string}"  # type: ignore
+        text = (
+            f"{expression_context.prefix_string}{expression.value}"
+            f"{expression_context.suffix_string}"  # type: ignore
+        )
     else:
-        data = str(expression.data) if not hasattr(expression.data, "value") else expression.data.value  # type: ignore
+        data = (
+            str(expression.data)
+            if not hasattr(expression.data, "value")
+            else expression.data.value  # type: ignore
+        )
         try:
             expr_str = _etostr(expression)
-            text = f"{expression_context.prefix_string}{expr_str}{expression_context.suffix_string}"  # type: ignore
+            text = (
+                f"{expression_context.prefix_string}{expr_str}"
+                f"{expression_context.suffix_string}"  # type: ignore
+            )
         except Exception:
             text = f"{expression_context.prefix_string}<{data}>{expression_context.suffix_string}"
 
@@ -762,11 +778,18 @@ def _format_comma_separated_list(
 
     # Check if we can fit on one line
     joined = ", ".join(e[0] for e in elements)
-    total_len = len(expression_context.prefix_string) + len(joined) + len(expression_context.suffix_string)  # type: ignore
+    total_len = (
+        len(expression_context.prefix_string)
+        + len(joined)
+        + len(expression_context.suffix_string)  # type: ignore
+    )
     total_len += len(indent_string.replace("\t", "    "))  # rough estimate
 
     if total_len <= max_len and len(elements) < 10:
-        text = f"{expression_context.prefix_string}{joined}{expression_context.suffix_string}"  # type: ignore
+        text = (
+            f"{expression_context.prefix_string}{joined}"
+            f"{expression_context.suffix_string}"  # type: ignore
+        )
         return [(expression_context.prefix_line, f"{indent_string}{text}")]
 
     # Multi-line format
@@ -774,7 +797,10 @@ def _format_comma_separated_list(
     first = True
     for elem_text, _ in elements:
         if first and expression_context.prefix_string:
-            lines.append((expression_context.prefix_line, f"{indent_string}{expression_context.prefix_string}{elem_text},"))  # type: ignore
+            first_line_text = (
+                f"{indent_string}{expression_context.prefix_string}{elem_text},"
+            )
+            lines.append((expression_context.prefix_line, first_line_text))  # type: ignore
             first = False
         elif first:
             lines.append(
@@ -827,7 +853,7 @@ def _block_argument_lines(
     return lines
 
 
-def _format_postfix_multi(
+def _format_postfix_multi(  # noqa: C901
     postfix: Tree, expr_ctx: ExpressionContext, indent_string: str, style=None
 ) -> FormattedLines:
     """Format attribute/call chains across multiple lines.
@@ -865,19 +891,31 @@ def _format_postfix_multi(
     def _is_attribute(node):
         if isinstance(node, Token):
             return False
-        d = str(getattr(node.data, "value", node.data)) if not hasattr(node.data, "value") else node.data.value  # type: ignore
+        d = (
+            str(getattr(node.data, "value", node.data))
+            if not hasattr(node.data, "value")
+            else node.data.value  # type: ignore
+        )
         return d == "attribute"
 
     def _is_subscript(node):
         if isinstance(node, Token):
             return False
-        d = str(getattr(node.data, "value", node.data)) if not hasattr(node.data, "value") else node.data.value  # type: ignore
+        d = (
+            str(getattr(node.data, "value", node.data))
+            if not hasattr(node.data, "value")
+            else node.data.value  # type: ignore
+        )
         return d in ("subscript",)
 
     def _is_call_suffix(node):
         if isinstance(node, Token):
             return False
-        d = str(getattr(node.data, "value", node.data)) if not hasattr(node.data, "value") else node.data.value  # type: ignore
+        d = (
+            str(getattr(node.data, "value", node.data))
+            if not hasattr(node.data, "value")
+            else node.data.value  # type: ignore
+        )
         return d in ("call_suffix",)
 
     non_none_children = [c for c in getattr(postfix, "children", []) if c is not None]
@@ -1028,13 +1066,14 @@ def _format_postfix_multi(
                 _arg_lines.append((None, f"{indent_string}){suffix_text}"))
                 return _arg_lines
 
-    # Check if any segment contains content that forces multiline (e.g., arrays with trailing commas)
+    # Check if any segment contains content that forces multiline (e.g.,
+    # arrays with trailing commas)
     def _get_array_from_subscript(sub_node):
-        """Unwrap through assignment/cast/ternary/type_test to find the actual array inside a subscript."""
+        """Unwrap through assignment/cast/ternary/type_test to find the
+        actual array inside a subscript."""
         for c in getattr(sub_node, "children", []):
             if c is None or not isinstance(c, Tree):
                 continue
-            d = str(getattr(c.data, "value", c.data))
             # Unwrap wrapper types to find the inner array
             unwrapped = c
             while unwrapped and isinstance(unwrapped, Tree):
@@ -1316,7 +1355,8 @@ def _format_postfix_multi(
     ):
         return _format_pure_subscript_chain()
 
-    # If there are arrays with trailing commas inside subscripts, we MUST use paren-wrapped multiline format.
+    # If there are arrays with trailing commas inside subscripts, we MUST
+    # use paren-wrapped multiline format.
     if has_forced_multiline_children:
         # The chain's segments are continuation lines of the `(` this wraps them in, so they get
         # the two levels; the items of a subscript's own brackets, and its closing bracket, hang
@@ -1326,7 +1366,8 @@ def _format_postfix_multi(
         bracket_close_indent = inner_indent2
         result_lines = [(first_line_no, f"{indent_string}{prefix_text}(")]
 
-        # Build a set of subscripts that need expanding (contain arrays with trailing commas/comments/many elements)
+        # Build a set of subscripts that need expanding (contain arrays with
+        # trailing commas/comments/many elements)
         expanding_subscripts = set()
         for seg in segments:
             for s in seg:
@@ -1352,7 +1393,8 @@ def _format_postfix_multi(
             )
 
             if seg_has_expanding:
-                # Extract the name/identifier for this segment (first non-subscript token or attr name)
+                # Extract the name/identifier for this segment (first
+                # non-subscript token or attr name)
                 prefix_content = ""
                 for s in seg:
                     if isinstance(s, Token):
@@ -1579,8 +1621,6 @@ def _format_postfix_multi(
         these should stay inline even when combined would exceed line length, to avoid
         producing garbled output with blank lines between parens.
         """
-        from lark import Token as LarkToken
-
         call_trees = [
             s
             for s in seg
@@ -1598,7 +1638,7 @@ def _format_postfix_multi(
         for cs in call_trees:
             parts = []
             for c in getattr(cs, "children", []):
-                if c is None or isinstance(c, LarkToken):
+                if c is None or isinstance(c, Token):
                     ttype = (
                         str(getattr(c, "type", "")).lower()
                         if hasattr(c, "type")
@@ -1637,7 +1677,6 @@ def _format_postfix_multi(
     def _format_hybrid_inline():
         result_lines = []
         chain_parts = [prefix_text]  # Start building first line content
-        break_idx = None
 
         for i, seg in enumerate(segments):
             seg_str = _format_segment_content(seg)
@@ -1678,8 +1717,6 @@ def _format_postfix_multi(
                     chain_parts.append(seg_str)
                     continue
 
-                break_idx = i
-
                 # Build the opening line with all segments up to this point + name of breaking seg
                 open_chain = "".join(chain_parts)  # Everything before breaking seg
 
@@ -1687,7 +1724,7 @@ def _format_postfix_multi(
                 for s in seg:
                     if isinstance(s, Tree):
                         d = str(getattr(s.data, "value", getattr(s.data, "", "")))
-                        if d == "call_suffix" or d == "subscript":
+                        if d in ("call_suffix", "subscript"):
                             break
                         elif d in ("attribute", "attribute_name"):
                             all_names: List[str] = []
@@ -2160,7 +2197,7 @@ def _format_postfix_multi(
     return result_lines
 
 
-def _format_foldable_to_multiple_lines(
+def _format_foldable_to_multiple_lines(  # noqa: C901
     expression: Tree,
     expression_context: ExpressionContext,
     indent_string: str,
@@ -2316,7 +2353,8 @@ def _format_foldable_to_multiple_lines(
     if data in ("assignment", "cast", "ternary"):
 
         def find_operator_or_postfix(node):
-            """Walk through wrapper types to find an operator chain, postfix, or unary (sign/bit_not/logic_not) node."""
+            """Walk through wrapper types to find an operator chain, postfix,
+            or unary (sign/bit_not/logic_not) node."""
             for child in getattr(node, "children", []):
                 if child is None or not hasattr(child, "data"):
                     continue
@@ -2394,7 +2432,8 @@ def _format_foldable_to_multiple_lines(
                     style or StyleConfig(),
                 )
             elif inner_data in ("sign", "bit_not", "logic_not"):
-                # Unary operator wrapping an additive/shift/etc chain — needs special multiline format.
+                # Unary operator wrapping an additive/shift/etc chain — needs
+                # special multiline format.
                 # For: var w = -(1+1+1+...)  →  var w = -(
                 #                                       1
                 #                                       + 1
@@ -2404,8 +2443,10 @@ def _format_foldable_to_multiple_lines(
                     inner_node, expression_context, indent_string, style
                 )
         else:
-            # No operator chain found inside — format the whole expression on multiple lines if too long.
-            # This handles cases like: var very_long_name = ^"../Some/Stuff" when total line > 100 chars
+            # No operator chain found inside — format the whole expression on
+            # multiple lines if too long.
+            # This handles cases like: var very_long_name = ^"../Some/Stuff"
+            # when total line > 100 chars
             from .expression_to_str import expression_to_str as _etostr
 
             try:
@@ -2515,7 +2556,8 @@ def _format_foldable_to_multiple_lines(
 
             inner_expr_to_use = unwrapped_inner
 
-            # If the inner expression is an operator chain or postfix, delegate to multiline handler with prefix
+            # If the inner expression is an operator chain or postfix,
+            # delegate to multiline handler with prefix
             if inner_expr_to_use is not None and hasattr(inner_expr_to_use, "data"):
                 d = _tree_data_str(inner_expr_to_use)
                 # The grammar's binary chain rules, loosest first. The list used to carry
@@ -2561,7 +2603,10 @@ def _format_foldable_to_multiple_lines(
             # prefix is never dropped from the length decision.
             expr_str = _etostr(expression)
             max_len = style.line_length if style else 100
-            display_text = f"{expression_context.prefix_string}{expr_str}{expression_context.suffix_string}"
+            display_text = (
+                f"{expression_context.prefix_string}{expr_str}"
+                f"{expression_context.suffix_string}"
+            )
             display_length = len((indent_string + display_text).replace("\t", "    "))
             if display_length <= max_len:
                 return [
@@ -2653,7 +2698,10 @@ def _format_foldable_to_multiple_lines(
 
         try:
             expr_str = _etostr(expression)
-            text = f"{expression_context.prefix_string}{expr_str}{expression_context.suffix_string}"  # type: ignore
+            text = (
+                f"{expression_context.prefix_string}{expr_str}"
+                f"{expression_context.suffix_string}"  # type: ignore
+            )
             return [(expression_context.prefix_line, f"{indent_string}{text}")]
         except Exception:
             return [
@@ -2679,20 +2727,20 @@ def _format_foldable_to_multiple_lines(
                 )[0]
             ]
     if isinstance(result, ExpressionContext):
+        first_child = (
+            expression.children[0]
+            if hasattr(expression, "children") and expression.children
+            else expression  # type: ignore
+        )
         return [
-            (
-                _format_standalone_expression(
-                    expression.children[0] if hasattr(expression, "children") and expression.children else expression,  # type: ignore
-                    result,
-                    indent_string,
-                    style or StyleConfig(),
-                )
+            _format_standalone_expression(
+                first_child, result, indent_string, style or StyleConfig()
             )
         ]
     return result
 
 
-def _format_unary_chain_multi(
+def _format_unary_chain_multi(  # noqa: C901
     expression: Tree,
     expression_context: ExpressionContext,
     indent_string: str,
@@ -2710,8 +2758,6 @@ def _format_unary_chain_multi(
             ...
         )
     """
-    from lark import Token
-
     # Determine the unary operator prefix
     op_prefix = ""
     non_none = [c for c in getattr(expression, "children", []) if c is not None]
@@ -2855,7 +2901,8 @@ def _format_unary_operator_chain_multi(
     indent_string: str,
     style=None,
 ) -> FormattedLines:
-    """Format an operator chain inside a unary (sign/bit_not/logic_not) context across multiple lines.
+    """Format an operator chain inside a unary (sign/bit_not/logic_not) context
+    across multiple lines.
 
     Special wrapper around _format_operator_chain_multi that adds the unary operator prefix
     before the opening paren and preserves proper multiline formatting.
@@ -2909,7 +2956,7 @@ def _format_unary_operator_chain_multi(
     # Build compact segments: [operand, "op operand", "op operand", ...]
     compact_segments = []
     for i in range(0, len(parts), 2):
-        ptype, pval = parts[i]  # operand
+        _, pval = parts[i]  # operand
         op_prefix = ""
         if i > 0 and i - 1 < len(parts):
             prev_ptype, prev_pval = parts[i - 1]
@@ -2969,8 +3016,6 @@ def _format_unary_operator_chain_multi(
 
 def _tree_data_str(node) -> str:
     """Return a tree's rule name as a plain string."""
-    from lark import Tree
-
     if isinstance(node, Tree):
         d = node.data
         return str(d) if not hasattr(d, "value") else d.value  # type: ignore
@@ -3113,8 +3158,13 @@ def _format_array_multi(
         and len(element_nodes) < 10
         and not any(_is_forced_multiline(e, style) for e in element_nodes)
     ):
-        tc_str = ""  # No trailing comma in inline mode
-        return [(expr_ctx.prefix_line, f"{indent_string}{expr_ctx.prefix_string}[{joined}]{expr_ctx.suffix_string}")]  # type: ignore
+        return [
+            (
+                expr_ctx.prefix_line,
+                f"{indent_string}{expr_ctx.prefix_string}[{joined}]"
+                f"{expr_ctx.suffix_string}",  # type: ignore
+            )
+        ]
 
     # Multi-line format with proper indentation
     inner_indent = collection_indent(indent_string)
@@ -3157,7 +3207,7 @@ def _format_array_multi(
         # Source line of whatever was emitted last, so a comment written on the same
         # line rides on that line (`1,  # b`) and one on its own line does not.
         prev_line = _node_line(array)
-        for i, (kind, node, had_comma) in enumerate(layout):
+        for _, (kind, node, had_comma) in enumerate(layout):
             if kind == "comment":
                 text = _comment_layout_text(node)
                 c_line = _node_line(node)
@@ -3314,10 +3364,8 @@ def _format_array_multi_inner(array: Tree, indent_string: str, style=None) -> li
 
 def _unwrap_for_tc_check(node):
     """Unwrap wrapper nodes to find the innermost expression for trailing comma check."""
-    from lark import Tree as LarkTree
-
     WRAPPERS = frozenset({"assignment", "cast", "ternary", "type_test"})
-    while isinstance(node, LarkTree) and _tree_data_str(node) in WRAPPERS:
+    while isinstance(node, Tree) and _tree_data_str(node) in WRAPPERS:
         for c in getattr(node, "children", []):
             if c is not None and isinstance(c, Tree):
                 node = c
@@ -3516,7 +3564,6 @@ def _check_any_child_element_has_trailing_tc(element_nodes):
     has a trailing comma but the outer doesn't.
     """
     from .expression_utils import has_trailing_comma as _htc
-    from lark import Tree as LarkTree
 
     WRAPPERS = frozenset({"assignment", "cast", "ternary", "type_test"})
 
@@ -3524,7 +3571,7 @@ def _check_any_child_element_has_trailing_tc(element_nodes):
         if not isinstance(node, Tree) or depth > 15:
             return False
         # Unwrap wrappers to find inner content
-        while isinstance(node, LarkTree) and _tree_data_str(node) in WRAPPERS:
+        while isinstance(node, Tree) and _tree_data_str(node) in WRAPPERS:
             for c in getattr(node, "children", []):
                 if c is not None and isinstance(c, Tree):
                     node = c
@@ -3561,7 +3608,7 @@ def _check_any_child_element_has_trailing_tc(element_nodes):
     return False
 
 
-def _format_dict_multi(
+def _format_dict_multi(  # noqa: C901
     dict_tree: Tree, expr_ctx: ExpressionContext, indent_string: str, style=None
 ) -> FormattedLines:
     from .expression_to_str import expression_to_str as _etostr
@@ -3670,15 +3717,29 @@ def _format_dict_multi(
         # Single-line dictionary: the style guide asks for a space after `{` and before `}`
         # so it is visually distinct from an array.
         if not elements:
-            return [(expr_ctx.prefix_line, f"{indent_string}{prefix_text}{{}}{expr_ctx.suffix_string}")]  # type: ignore
-        return [(expr_ctx.prefix_line, f"{indent_string}{prefix_text}{{ {compact_joined} }}{expr_ctx.suffix_string}")]  # type: ignore
+            return [
+                (
+                    expr_ctx.prefix_line,
+                    f"{indent_string}{prefix_text}{{}}"
+                    f"{expr_ctx.suffix_string}",  # type: ignore
+                )
+            ]
+        return [
+            (
+                expr_ctx.prefix_line,
+                f"{indent_string}{prefix_text}{{ {compact_joined} }}"
+                f"{expr_ctx.suffix_string}",  # type: ignore
+            )
+        ]
 
     inner_indent = collection_indent(indent_string)
     inner_width = len(inner_indent.replace("\t", "    "))
     closing = expr_ctx.suffix_string if isinstance(expr_ctx.suffix_string, str) else ""
 
     # First line: prefix + opening brace
-    lines: FormattedLines = [(expr_ctx.prefix_line, f"{indent_string}{prefix_text}{{")]  # type: ignore
+    lines: FormattedLines = [
+        (expr_ctx.prefix_line, f"{indent_string}{prefix_text}{{"),  # type: ignore
+    ]
 
     if (
         not has_comments
@@ -3693,7 +3754,7 @@ def _format_dict_multi(
         prev_line = _node_line(dict_tree)
         entry_total = len(entries)
         entry_index = -1
-        for i, item in enumerate(ordered):
+        for _, item in enumerate(ordered):
             if item[0] == "comment":
                 text = _comment_layout_text(item[1])
                 c_line = _node_line(item[1])
@@ -3815,7 +3876,16 @@ def _format_call_multi(
 
     for i in range(1, len(call.children)):  # type: ignore
         arg_str = expression_to_str_safe(call.children[i])  # type: ignore
-        comma = "," if i < args_count - 1 or (len(call.children) > 2 and call.children[-1] and str(call.children[-1].data).endswith("trailing")) else ""  # type: ignore
+        comma = (
+            ","
+            if i < args_count - 1
+            or (
+                len(call.children) > 2
+                and call.children[-1]
+                and str(call.children[-1].data).endswith("trailing")
+            )
+            else ""  # type: ignore
+        )
         lines.append((None, f"    {arg_str}{comma}"))
 
     return lines
@@ -4149,7 +4219,7 @@ def _find_lambda_argument(call_node):
     return None
 
 
-def _format_lambda_multi(
+def _format_lambda_multi(  # noqa: C901
     lambda_tree: Tree, ec: ExpressionContext, indent_string: str, style=None
 ) -> FormattedLines:
     """Format a multiline lambda expression with proper parameter splitting and suite formatting.
@@ -4196,7 +4266,7 @@ def _format_lambda_multi(
             data_name = str(getattr(child.data, "value", str(child.data)))
 
             # Handle specific rule types regardless of in_params state
-            if data_name == "parameters" or data_name == "signal_parameters":
+            if data_name in ("parameters", "signal_parameters"):
                 from .expression_to_str import lambda_parameter_strings
 
                 param_names = lambda_parameter_strings(child)
@@ -4205,7 +4275,11 @@ def _format_lambda_multi(
                 has_return_type = True
                 return_type_str = expression_to_str_safe(child)
             elif data_name == "suite":
-                suite_children = list(child.children) if hasattr(child, "children") else []  # type: ignore
+                suite_children = (
+                    list(child.children)
+                    if hasattr(child, "children")
+                    else []  # type: ignore
+                )
 
         elif isinstance(child, Token):
             # Optional named lambda: func baz(...) — NAME token after FUNC
@@ -4386,7 +4460,11 @@ def _format_lambda_multi(
 
 def _format_not_test_multi(not_expr, ec, indent, style=None):
     op = expression_to_str_safe(not_expr.children[0]) if not_expr.children else ""  # type: ignore
-    expr = expression_to_str_safe(not_expr.children[1]) if len(not_expr.children) > 1 else "?"  # type: ignore
+    expr = (
+        expression_to_str_safe(not_expr.children[1])
+        if len(not_expr.children) > 1
+        else "?"  # type: ignore
+    )
     return [(ec.prefix_line, f"{indent}{op} {expr}")]
 
 

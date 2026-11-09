@@ -3,7 +3,7 @@
 Provides `format_code()` as the main entry point, taking an already-parsed
 tree and StyleConfig to produce formatted GDScript code.
 """
-from typing import List, Optional
+from typing import List
 
 from lark import Tree, Token
 
@@ -124,7 +124,7 @@ def _block_is_over_long(lines, start, end, limit):
     )
 
 
-def _extract_top_level(tree: Tree):
+def _extract_top_level(tree: Tree):  # noqa: C901
     """Extract top-level file items from the parse tree.
 
     The grammar produces: start -> (file_item | _NL)* where file_item can be:
@@ -248,7 +248,6 @@ def _attach_inline_to_previous(items, comment_node) -> bool:
     """If `comment_node` sits on the same line as the previous member or annotation
     item, turn that item into an inline-comment 3-tuple and return True."""
     from .comments import normalize_comment
-    from ..common.utils import get_end_line
 
     tok = next(
         (t for t in getattr(comment_node, "children", []) if isinstance(t, Token)), None
@@ -309,7 +308,7 @@ def _attach_comment_to_annotation(annotation_node: Tree, comment_node: Tree) -> 
     """
     # Find arguments subtree to attach comment before closing paren
     args_tree = None
-    for i, c in enumerate(getattr(annotation_node, "children", [])):
+    for _, c in enumerate(getattr(annotation_node, "children", [])):
         if isinstance(c, Tree) and _tree_data_str(c).lower() == "arguments":
             args_tree = c
             break
@@ -324,8 +323,6 @@ def _attach_comment_to_annotation(annotation_node: Tree, comment_node: Tree) -> 
 
 
 def _tree_data_str(node) -> str:
-    from lark import Tree
-
     if isinstance(node, Tree):
         d = node.data
         return str(d) if not hasattr(d, "value") else d.value  # type: ignore

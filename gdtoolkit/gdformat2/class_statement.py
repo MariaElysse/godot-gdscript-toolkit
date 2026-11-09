@@ -8,7 +8,6 @@ from .context import ExpressionContext
 from .style_config import StyleConfig
 from .types import FormattedLines, Outcome
 from .block import format_block
-from .expression import format_expression
 from .var_statement import format_var_statement, _safe_str  # noqa: F401
 from .const_statement import format_const_statement
 from .statement_utils import format_simple_statement
@@ -65,7 +64,7 @@ def format_class_statement(
             get_end_line_safe(statement),
         )
 
-    handler = _HANDLERS.get(stmt_data, lambda s, i, l, st: ([], 0))  # type: ignore
+    handler = _HANDLERS.get(stmt_data, lambda s, i, ln, st: ([], 0))  # type: ignore
     result = handler(statement, indent_string, indent_level, style)
 
     return result
@@ -81,7 +80,6 @@ def _format_root_comment(
 
     Root comments should NOT be indented - they go at column 0.
     """
-    text = _get_comment_text(comment_node)
     end_line = get_end_line_safe(comment_node) if hasattr(comment_node, "meta") else 1
     # Root-level comments appear at column 0 (no indentation).
     return ([], end_line)
@@ -237,7 +235,7 @@ def _absorb_member_comments(member, siblings) -> None:
     siblings[:] = [c for c in siblings if not any(c is a for a in absorbed)]
 
 
-def _format_enum_decl(
+def _format_enum_decl(  # noqa: C901
     statement: Tree, indent_string: str, indent_level: int, style=None
 ) -> Outcome:
     """Format an enum declaration.
@@ -257,7 +255,6 @@ def _format_enum_decl(
     # Extract enum name (direct NAME child of enum_decl, not nested) and body tree
     name_token = None
     body_tree = None
-    has_trailing_comma = False
 
     for child in children_list:
         if child is None:
@@ -295,7 +292,6 @@ def _format_enum_decl(
                             isinstance(ec, Token)
                             and str(getattr(ec, "type", "")).lower() == "comma"
                         ):
-                            has_trailing_comma = True
                             break
 
     # Build output string directly
@@ -364,7 +360,6 @@ def _format_enum_decl(
 
         entry_parts = [ep for ep in entry_parts if ep.strip()]
         max_len = style.line_length if style else 100
-        start_line = get_line_safe(statement)
         end_line = get_end_line_safe(statement)
 
         # Comments attached to the enum: those moved in from the enclosing class_member
@@ -479,7 +474,7 @@ def _format_enum_decl(
     return ([(get_line(statement), line_str)], get_end_line_safe(statement))
 
 
-def _format_func_decl(
+def _format_func_decl(  # noqa: C901
     statement: Tree, indent_string: str, indent_level: int, style=None
 ) -> Outcome:
     """Format a function declaration (top-level or nested class)."""
@@ -501,7 +496,9 @@ def _format_func_decl(
     for child in children_list:
         if isinstance(child, Token):
             t_str = str(_tree_data_str(child)).lower()  # type: ignore
-            if t_str == "parenthesis_open" or (isinstance(child, Token) and child.type == "PARENTHESIS_OPEN"):  # type: ignore
+            if t_str == "parenthesis_open" or (
+                isinstance(child, Token) and child.type == "PARENTHESIS_OPEN"
+            ):  # type: ignore
                 inside_parens = True
             elif t_str == "colon":
                 break
@@ -548,13 +545,6 @@ def _format_func_decl(
             param_tree, f"{indent_string}{prefix}{func_name}(", indent_string, style
         )
 
-    expression_context = ExpressionContext(
-        f"{prefix}{func_name}",
-        get_line_safe(statement),
-        suffix_part,
-        get_end_line_safe(statement),
-    )
-
     # Format parameters using expression_to_str (handles the "parameters" data_map handler)
     from .expression_to_str import expression_to_str as _ets
 
@@ -596,7 +586,11 @@ def _format_func_decl(
                         if hasattr(sub_child, "meta")
                         else -1
                     )
-                    if hasattr(sub_child, "meta") and sub_child.meta.line == int(func_line_no) and col > len(indent_string + prefix + func_name):  # type: ignore
+                    if (
+                        hasattr(sub_child, "meta")
+                        and sub_child.meta.line == int(func_line_no)
+                        and col > len(indent_string + prefix + func_name)
+                    ):  # type: ignore
                         for cc in getattr(sub_child, "children", []):
                             if (
                                 isinstance(cc, Token)
@@ -663,9 +657,7 @@ def _format_func_decl(
                 statement, skip_inline_comment_line_no=int(func_line_no)
             )
         )
-        suite_content, orphaned_comments_list = (
-            suite_result if suite_result else ([], [])
-        )
+        suite_content, _orphaned = suite_result if suite_result else ([], [])
     else:
         # Nested: still need suite content but don't extract orphans (parent handles them)
         # The parent (_format_inner_class) has already extracted orphans from this node,
@@ -684,7 +676,6 @@ def _format_func_decl(
             suite_content, _orphaned = suite_result
         else:
             suite_content = []
-        orphaned_comments_list = None
 
     if suite_content:
         # Proper indentation respecting use_spaces setting
@@ -694,7 +685,7 @@ def _format_func_decl(
             tab_size = style.tab_size or 4
             num_levels = (indent_level // max(tab_size, 1)) + 1
             body_indent = " " * (tab_size * num_levels)
-        body_lines, last_line_no = format_block(
+        body_lines, _ = format_block(
             suite_content,
             _format_func_body_statement,
             body_indent,
@@ -720,7 +711,7 @@ def _ends_on_line(node, line) -> bool:
         return getattr(getattr(node, "meta", None), "line", None) == line
 
 
-def _format_inner_class(
+def _format_inner_class(  # noqa: C901
     statement: Tree, indent_string: str, indent_level: int, style=None
 ) -> Outcome:
     """Format a nested class declaration."""
@@ -761,7 +752,6 @@ def _format_inner_class(
     class_block_children = []
     first_comment_emitted = False
     # First pass: collect all children from class_block
-    orphaned_comments: list = []
 
     for child in getattr(statement, "children", []):
         if hasattr(child, "data"):
@@ -819,7 +809,7 @@ def _format_inner_class(
                                     break
 
     class_body_stmts = []
-    for i, sub_child in enumerate(class_block_children):
+    for _, sub_child in enumerate(class_block_children):
         if not hasattr(sub_child, "data"):
             continue
         sd = _tree_data_str(sub_child).lower()
@@ -827,11 +817,7 @@ def _format_inner_class(
         # Handle comments from class_block specially
         if "comment" in sd:
             comment_line_no = getattr(getattr(sub_child, "meta", None), "line", 0)
-            is_inline_var_comment = (
-                comment_line_no in var_inline_comments
-                and not has_inline_comment
-                or first_comment_emitted
-            )
+            is_inline_var_comment = first_comment_emitted
             if has_inline_comment and not first_comment_emitted:
                 first_comment_emitted = True
                 continue
@@ -845,8 +831,8 @@ def _format_inner_class(
         elif "class_member" in sd:
             # class_member wraps the actual declaration - unwrap it
             for inner in getattr(sub_child, "children", []):
-                if hasattr(inner, "data") and not (
-                    _tree_data_str(inner).lower() in ("end", "_nl", "comment")
+                if hasattr(inner, "data") and (
+                    _tree_data_str(inner).lower() not in ("end", "_nl", "comment")
                 ):
                     inner_data = _tree_data_str(inner).lower()
                     # Check for orphaned comments INSIDE nested inner_class's block
@@ -856,13 +842,15 @@ def _format_inner_class(
                             ("member", inner)
                         )  # Add inner_class first
                         if comment_node is not None:
-                            # Insert orphan IMMEDIATELY after this inner_class (preserves source order)
+                            # Insert orphan IMMEDIATELY after this inner_class (preserves
+                            # source order)
                             class_body_stmts.append(("__comment__", comment_node))
                     # Check for orphaned comments INSIDE function suites
                     elif inner_data == "function_decl":
                         _, func_suite_orphans = _find_suite_or_empty(inner)
                         if func_suite_orphans:
-                            # Remove orphaned comments from the suite so they won't appear in formatting
+                            # Remove orphaned comments from the suite so they won't appear
+                            # in formatting
                             for child in getattr(inner, "children", []):
                                 if hasattr(child, "data") and str(
                                     _tree_data_str(child)
@@ -873,7 +861,8 @@ def _format_inner_class(
                                                 child.children.remove(oc)
                                         except ValueError:
                                             pass
-                            # Add orphans AFTER this function member (matching source order: comment follows the declaration it was attached to)
+                            # Add orphans AFTER this function member (matching source
+                            # order: comment follows the declaration it was attached to)
                         class_body_stmts.append(("member", inner))
                         for oc in func_suite_orphans:
                             class_body_stmts.append(("__comment__", oc))
@@ -924,7 +913,7 @@ def _format_inner_class(
             tab_size = style.tab_size or 4
             num_levels = (indent_level // max(tab_size, 1)) + 1
             body_indent = " " * (tab_size * num_levels)
-        class_lines, last_line_no = format_block(
+        class_lines, _ = format_block(
             class_body_stmts,
             format_class_statement,
             body_indent,
@@ -944,7 +933,7 @@ def _format_func_body_statement(
 
     # If wrapped in tuple (from block), unwrap it first
     if isinstance(statement, tuple):
-        tag, real_node = statement  # type: ignore
+        _, real_node = statement  # type: ignore
         return fmt_func_stmt(real_node, indent_string, indent_level, style)
 
     return fmt_func_stmt(statement, indent_string, indent_level, style)
@@ -964,7 +953,7 @@ def _format_bare_string(
     for child in getattr(statement, "children", []):
         if isinstance(child, Token):
             ttype = str(child.type).lower()
-            if ttype == "regular_string" or ttype == "string":
+            if ttype in ("regular_string", "string"):
                 return _format_bare_string_token(child, indent_string)
             elif ttype in ("long_string", "long_rstring"):
                 # Triple-quoted strings - normalize to double quotes
@@ -979,13 +968,14 @@ def _format_bare_string(
     stmt_data = (
         _tree_data_str(statement).lower() if hasattr(statement, "data") else "unknown"
     )
-    return ([(get_line_safe(statement), f"{indent_string}/* {stmt_data} */")], get_end_line_safe(statement))  # type: ignore
+    return (
+        [(get_line_safe(statement), f"{indent_string}/* {stmt_data} */")],
+        get_end_line_safe(statement),
+    )  # type: ignore
 
 
 def _format_bare_string_token(token: Token, indent_string: str) -> Outcome:
     """Format a bare string token with proper quote normalization."""
-    raw = str(token.value)
-
     # Get the start position (could be int or tuple depending on Lark version)
     pos = getattr(token, "start_pos", None)
     if isinstance(pos, int):
@@ -1018,7 +1008,10 @@ def _format_unknown_class_member(
     stmt_data = (
         _tree_data_str(statement).lower() if hasattr(statement, "data") else "unknown"
     )
-    return ([(get_line_safe(statement), f"{indent_string}/* {stmt_data} */")], get_end_line_safe(statement))  # type: ignore
+    return (
+        [(get_line_safe(statement), f"{indent_string}/* {stmt_data} */")],
+        get_end_line_safe(statement),
+    )  # type: ignore
 
 
 # ─── Populate handlers after all functions are defined ──────────────────────
@@ -1032,11 +1025,11 @@ _HANDLERS.update(
         "function_decl": _format_func_decl,
         "inner_class": _format_inner_class,
         # Top-level file items
-        "extends_stmt": lambda s, i, l, st: format_extends_stmt(s, i, l),
-        "class_name_stmt": lambda s, i, l, st: format_class_name_stmt(s, i, l),
+        "extends_stmt": lambda s, i, ln, st: format_extends_stmt(s, i, ln),
+        "class_name_stmt": lambda s, i, ln, st: format_class_name_stmt(s, i, ln),
         # Simple statements at class/file level
         "pass_stmt": partial(format_simple_statement, "pass"),
-        "local_variable": lambda s, i, l, st: format_var_statement(s, i, l, st),  # type: ignore
+        "local_variable": format_var_statement,  # type: ignore
         # Bare expressions (standalone strings)
         "bare_string": _format_bare_string,
         # Decorator annotations
@@ -1061,7 +1054,7 @@ def get_end_line_safe(node) -> int:
         return 1
 
 
-def _find_inline_comment(
+def _find_inline_comment(  # noqa: C901
     statement: Tree, declaration_line: int, decl_prefix: str
 ) -> Optional[str]:
     """Find a comment that should appear inline with the declaration.
@@ -1113,7 +1106,7 @@ def _find_inline_comment(
                 ):
                     first_body_idx = idx
 
-            if first_comment_idx >= 0 and first_comment_idx < first_body_idx:
+            if 0 <= first_comment_idx < first_body_idx:
                 # Extract the COMMENT token from inside the comment tree at that index
                 inline_child = list(getattr(child, "children", [None]))[
                     first_comment_idx
@@ -1186,8 +1179,6 @@ def _find_name_token_in_tree(tree_node: Tree):
 
 def _has_full_call_suffix(node: Tree) -> bool:
     """Check if a tree contains PARENTHESIS_OPEN/CLOSE tokens indicating a function call."""
-    from lark import Token
-
     if isinstance(node, Token):
         return node.type in ("PARENTHESIS_OPEN", "PARENTHESIS_CLOSE")
     if hasattr(node, "children"):
@@ -1197,7 +1188,7 @@ def _has_full_call_suffix(node: Tree) -> bool:
     return False
 
 
-def _find_suite_or_empty(
+def _find_suite_or_empty(  # noqa: C901
     statement: Tree, skip_inline_comment_line_no: int = 0, extract_orphans: bool = True
 ) -> tuple:
     """Find suite content within a function declaration.
@@ -1222,8 +1213,6 @@ def _find_suite_or_empty(
         A 2-tuple of (items, orphaned_comments) where items are the suite statements
         to format and orphaned_comments are comment nodes extracted for parent scope.
     """
-    from lark import Tree as LarkTree
-
     # Build inline comment map for local variables first
     inline_comments: Dict[int, str] = {}
 
@@ -1234,12 +1223,14 @@ def _find_suite_or_empty(
     )  # Track positions of processed statements to avoid duplicates
 
     for child in getattr(statement, "children", []):
-        if isinstance(child, LarkTree) and str(_tree_data_str(child)).lower().startswith("suite"):  # type: ignore
+        if isinstance(child, Tree) and str(_tree_data_str(child)).lower().startswith(
+            "suite"
+        ):  # type: ignore
             suite_children = list(getattr(child, "children", []))
 
             # First pass: detect inline comments on local variables
             for i, sub_child in enumerate(suite_children):
-                if isinstance(sub_child, LarkTree) and hasattr(sub_child, "data"):
+                if isinstance(sub_child, Tree) and hasattr(sub_child, "data"):
                     sd = _tree_data_str(sub_child).lower()
                     if "comment" in sd and hasattr(sub_child, "meta"):
                         comment_line_no = getattr(
@@ -1252,7 +1243,7 @@ def _find_suite_or_empty(
                         if i > 0:
                             prev = suite_children[i - 1]
                             if (
-                                isinstance(prev, LarkTree)
+                                isinstance(prev, Tree)
                                 and _tree_data_str(prev).lower() == "suite_line"
                             ):
                                 # Find end token to determine declaration column position
@@ -1290,7 +1281,7 @@ def _find_suite_or_empty(
             # body; a comment indented at the body level belongs to this suite.
             body_col = None
             for sub in suite_children:
-                if not isinstance(sub, LarkTree):
+                if not isinstance(sub, Tree):
                     continue
                 sub_d = _tree_data_str(sub).lower()
                 if "comment" in sub_d or "_nl" in sub_d or sub_d == "end":
@@ -1312,7 +1303,11 @@ def _find_suite_or_empty(
 
                 # Direct comment nodes inside suite - add as comments (or skip if inline)
                 if "comment" in sd:
-                    if skip_inline_comment_line_no > 0 and getattr(getattr(sub_child, "meta", None), "line", 0) == skip_inline_comment_line_no:  # type: ignore
+                    if (
+                        skip_inline_comment_line_no > 0
+                        and getattr(getattr(sub_child, "meta", None), "line", 0)
+                        == skip_inline_comment_line_no
+                    ):  # type: ignore
                         continue  # Skip - already added inline to header
                     comment_line_no = getattr(
                         getattr(sub_child, "meta", None), "line", 0
@@ -1685,7 +1680,7 @@ def format_class_name_stmt(
 ) -> Outcome:
     """Format a class_name statement: `class_name Foo` or `class_name Foo extends Target`."""
     parts = ["class_name"]
-    for i, child in enumerate(getattr(statement, "children", [])):
+    for _, child in enumerate(getattr(statement, "children", [])):
         if isinstance(child, Token):
             ttype = str(getattr(child, "type", "")).lower()
             if ttype == "class_name":  # Skip the CLASS_NAME keyword
@@ -1709,8 +1704,6 @@ def format_class_name_stmt(
 
 def _tree_data_str(node) -> str:
     """Return a tree's rule name or token type as a plain string."""
-    from lark import Tree, Token
-
     if isinstance(node, Token):
         return str(getattr(node, "type", ""))  # type: ignore
     elif isinstance(node, Tree):

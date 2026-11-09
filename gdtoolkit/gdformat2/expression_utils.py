@@ -1,5 +1,3 @@
-from typing import List, Optional
-
 from lark import Tree, Token
 
 
@@ -173,7 +171,11 @@ def is_foldable(expression) -> bool:
         return True
     if isinstance(expression, Token):
         return False
-    data = str(expression.data) if not hasattr(expression.data, "value") else expression.data.value  # type: ignore
+    data = (
+        str(expression.data)
+        if not hasattr(expression.data, "value")
+        else expression.data.value
+    )  # type: ignore
     return data not in non_foldable
 
 
@@ -220,8 +222,8 @@ def has_trailing_comma(expression) -> bool:
                 ]
                 if len(non_none_elems) >= 2:
                     last_elem = non_none_elems[-1]
-                    second_last = non_none_elems[-2]
-                    # Trailing comma pattern: ..., COMMA, None (last elem before trailing comma is COMMA)
+                    # Trailing comma pattern: ..., COMMA, None (last elem
+                    # before trailing comma is COMMA)
                     if (
                         isinstance(last_elem, Token)
                         and str(getattr(last_elem, "type", "")).upper() == "COMMA"
@@ -233,7 +235,9 @@ def has_trailing_comma(expression) -> bool:
 
 
 def is_trailing_comma(expression) -> bool:
-    return isinstance(expression, Tree) and _tree_data_str(expression) == "trailing_comma"  # type: ignore
+    return (
+        isinstance(expression, Tree) and _tree_data_str(expression) == "trailing_comma"
+    )  # type: ignore
 
 
 def is_any_comma(expression) -> bool:
@@ -249,7 +253,11 @@ def is_any_parentheses(expression) -> bool:
 def _is_multiline_string(expression) -> bool:
     if not isinstance(expression, Tree):
         return False
-    data_str = str(expression.data).lower() if hasattr(expression.data, "value") else expression.data  # type: ignore
+    data_str = (
+        str(expression.data).lower()
+        if hasattr(expression.data, "value")
+        else expression.data
+    )  # type: ignore
     if data_str != "string":
         return False
     first = getattr(expression, "children", [None])[0]
@@ -257,9 +265,7 @@ def _is_multiline_string(expression) -> bool:
 
 
 def _tree_data_str(node):
-    from lark import Tree as LarkTree
-
-    if isinstance(node, LarkTree):
+    if isinstance(node, Tree):
         d = node.data
         return str(d) if not hasattr(d, "value") else d.value  # type: ignore
     return ""

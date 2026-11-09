@@ -25,6 +25,8 @@ import pytest
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 
+# The gdtoolkit imports below deliberately follow the sys.path insertion (flake8 sees noqa: E402).
+# pylint: disable=wrong-import-position
 from gdtoolkit.gdformat2.formatter import format_code  # noqa: E402
 from gdtoolkit.gdformat2.parser import parser as parser_module  # noqa: E402
 from gdtoolkit.gdformat2.safety_checks import (  # noqa: E402
@@ -57,13 +59,17 @@ KNOWN_NON_IDEMPOTENT = {}
 # body becomes a block, so a comment trailing it is attached inside it; a long lambda's body is
 # emitted as a call path that re-parses as a different call node.
 KNOWN_TREE_INVARIANT_DIVERGENCES = {
-    "inline_properties": "an inline accessor list is laid out one accessor per line, which re-parses as the "
+    "inline_properties": "an inline accessor list is laid out one accessor per line, "
+    "which re-parses as the "
     "block form (`property` + `property_accessor_line`) instead of `untitled_property`",
     "inline_properties_w_comments": "as `inline_properties`, with the accessor list's own comments",
-    "multiline_properties_w_comments": "an accessor's trailing comment is emitted at the scope its column names, one level "
+    "multiline_properties_w_comments": "an accessor's trailing comment is emitted at the "
+    "scope its column names, one level "
     "shallower or deeper than it was written",
-    "inline_lambdas_w_comments": "a comment trailing an inline lambda's block body is attached inside the body",
-    "long_unistatement_lambdas": "a long lambda's body is emitted as a call path that re-parses as a different call node",
+    "inline_lambdas_w_comments": "a comment trailing an inline lambda's block body is "
+    "attached inside the body",
+    "long_unistatement_lambdas": "a long lambda's body is emitted as a call path that "
+    "re-parses as a different call node",
 }
 
 

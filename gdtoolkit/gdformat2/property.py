@@ -3,18 +3,23 @@
 Handles inline property accessors (get = __set, get: ... , set(x): ...)
 in variable declarations.
 """
-from typing import Dict, Callable
-
 from lark import Tree, Token
 
 from ..common.utils import get_line
-from .types import FormattedLines, Outcome
-from .context import ExpressionContext
+from .types import FormattedLines
 
 
 def has_inline_property_body(statement: Tree) -> bool:
     for child in getattr(statement, "children", []):
-        if isinstance(child, Tree) and str(child.data).endswith("property") or (hasattr(child, "data") and hasattr(child.data, "value") and "inline" in str(child.data.value)):  # type: ignore
+        if (
+            isinstance(child, Tree)
+            and str(child.data).endswith("property")
+            or (
+                hasattr(child, "data")
+                and hasattr(child.data, "value")
+                and "inline" in str(child.data.value)
+            )
+        ):  # type: ignore
             return True
     return False
 

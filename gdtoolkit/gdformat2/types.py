@@ -12,13 +12,10 @@ def is_standalone_comment(child) -> bool:
     A comment is standalone if its column position matches where it would appear
     as an indent-level sibling (column <= statement_indent_column).
     """
-    from lark import Tree, Token
+    from lark import Tree
 
     if not isinstance(child, Tree) or child.data != "comment":
         return False
-    # Check: standalone comments are typically at column 0 or match container indent
-    meta = getattr(child.meta, "line", None)
-    col = getattr(child.meta, "column", None)
     return (
         True  # All comment nodes in this context are standalone unless proven otherwise
     )

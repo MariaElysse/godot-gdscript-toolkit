@@ -5,4 +5,32 @@ disable =
     missing-module-docstring,   # too pedantic
     missing-class-docstring,    # too pedantic
     consider-using-f-string,    # TODO: fix only cases that make sense
-    duplicate-code              # TODO: check (fails on CI)
+    duplicate-code,             # TODO: check (fails on CI)
+
+    # --- Accepted structural/style debt (debt paydown pass, 2026-11) ---
+    import-outside-toplevel,    # deliberate: formatter modules defer imports to call time to break import cycles
+    cyclic-import,              # same cycles; call-time imports make them safe at runtime
+    broad-exception-caught,     # deliberate: gdformat/linter must not crash on exotic-but-valid trees; safety checks guard semantics
+    unused-argument,            # formatter call chain threads ctx/style uniformly for interface conformance
+    redefined-outer-name,       # inner helpers shadow imported names; call sites bind consistently, no effect on behavior
+
+    no-else-return,             # style choice: codebase consistently keeps else-branches after return/raise/continue
+    no-else-raise,
+    no-else-continue,
+    no-else-break,
+
+    too-many-branches,          # formatter functions are long translators; flake8 C901 sites carry explicit `# noqa: C901` markers
+    too-many-locals,
+    too-many-statements,
+    too-many-return-statements,
+    too-many-arguments,
+    too-many-positional-arguments,
+    too-many-nested-blocks,
+    too-many-lines,
+    too-many-instance-attributes,
+    too-many-public-methods,
+    too-many-boolean-expressions   # large dispatch conditions mirror the C901-marked translators
+
+[VARIABLES]
+# Accept UPPER_CASE for function-local constant tables (e.g. WRAPPERS) on top of the default snake_case.
+variable-rgx=(([a-z_][a-z0-9_]*)|([A-Z][A-Z0-9_]*))$

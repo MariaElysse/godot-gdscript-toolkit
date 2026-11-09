@@ -25,7 +25,6 @@ import os
 import pathlib
 import difflib
 from typing import List, Optional, Tuple
-from types import MappingProxyType
 from importlib.metadata import version as pkg_version
 
 from docopt import docopt
@@ -41,7 +40,6 @@ from .safety_checks import (
     FormattingStabilityViolation,
     CommentPersistenceViolation,
 )
-from .comments import gather_comments
 from ..common.utils import find_gd_files_from_paths
 
 CONFIG_FILE_NAME = "gdformat2rc"
@@ -63,7 +61,10 @@ def main():
     config_file_path = _find_config_file()
     config = _load_config_file_or_default(config_file_path)
     files = find_gd_files_from_paths(
-        arguments["<path>"], excluded_directories=frozenset(config.get("excluded_directories", [".git"]))  # type: ignore
+        arguments["<path>"],
+        excluded_directories=frozenset(
+            config.get("excluded_directories", [".git"])
+        ),  # type: ignore
     )
 
     line_length = (
@@ -104,9 +105,7 @@ def main():
 
 
 def _dump_default_config() -> None:
-    import os as _os
-
-    assert not _os.path.isfile(CONFIG_FILE_NAME)
+    assert not os.path.isfile(CONFIG_FILE_NAME)
     with open(CONFIG_FILE_NAME, "w", encoding="utf-8") as handle:
         config = {
             "excluded_directories": [".git"],
@@ -256,7 +255,7 @@ def _format_code(
     try:
         # Parse with comments embedded as tree nodes
         parse_tree = parser.parse(code)
-        comment_tree = parser.parse_comments(code)  # For safety check reference only
+        parser.parse_comments(code)  # For safety check reference only
 
         # Format using the AST serializer
         formatted_code = format_code(parse_tree, style)
@@ -276,10 +275,10 @@ def _format_code(
             f"STDIN:\n{lark.exceptions.UnexpectedToken.__doc__ or str(e)}",
             file=sys.stderr,
         )
-    except TreeInvariantViolation as e:
+    except TreeInvariantViolation:
         success = False
         print("Failed to format, formatted code parse tree differs", file=sys.stderr)
-    except FormattingStabilityViolation as e:
+    except FormattingStabilityViolation:
         success = False
         print("Failed to format, formatted code is unstable", file=sys.stderr)
     except CommentPersistenceViolation as e:

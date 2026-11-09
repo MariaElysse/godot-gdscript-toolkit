@@ -1,5 +1,3 @@
-from typing import List
-
 from lark import Tree, Token
 
 from .expression_utils import (
@@ -137,7 +135,7 @@ def expression_to_str(expression):
         "dict_literal": _dict_to_str,
         # New grammar: attribute chains (.foo.bar)
         # Grammar: attribute -> PERIOD (NAME | STRING)+ (PERIOD (NAME | STRING))*
-        "attribute": lambda e: _attribute_to_str(e),
+        "attribute": _attribute_to_str,
         # New grammar: comma-separated lists inside expressions
         "elements": lambda e: standalone_expression_to_str(e.children[0])
         if len(
@@ -160,7 +158,7 @@ def expression_to_str(expression):
         # Postfix expressions (function calls, subscriptions)
         "postfix": _postfix_to_str,
         "call_suffix": _call_suffix_to_str,
-        "arguments": lambda e: _arguments_from_tree(e),
+        "arguments": _arguments_from_tree,
         # Primary expressions (function calls, subscript, etc. with paren tokens)
         # (handled by the later "primary" entry - see _format_primary_with_paren_removal)
         # Old grammar types
@@ -207,7 +205,7 @@ def expression_to_str(expression):
         "getattr": lambda e: "".join(map(expression_to_str, e.children)),
         "subscr_expr": _subscription_to_str,
         "subscript": _subscription_to_str,  # New grammar subscript rule
-        "primary": lambda e: _format_primary_with_paren_removal(e),
+        "primary": _format_primary_with_paren_removal,
         "par_expr": _format_paren_expr,
         "array": _array_to_str,
         "dict": _dict_to_str,
@@ -215,7 +213,7 @@ def expression_to_str(expression):
         "eq_dict_element": _dict_element_to_str,
         "string": lambda e: expression_to_str(e.children[0]),
         "rstring": _rstring_to_str,
-        "get_node_expr": lambda e: _format_get_node_expr(e),
+        "get_node_expr": _format_get_node_expr,
         "get_node": lambda e: f"${expression_to_str(e.children[0])}",
         "path": lambda e: "".join([name_token.value for name_token in e.children]),
         "node_path": lambda e: f"^{expression_to_str(e.children[0])}",
@@ -398,7 +396,7 @@ def _type_test_to_str(expression: Tree) -> str:
     return _type_test_or_cast_to_str(expression)
 
 
-def _operator_chain_based_expression_to_str(expression: Tree) -> str:
+def _operator_chain_based_expression_to_str(expression: Tree) -> str:  # noqa: C901
     # Filter out None placeholders from maybe_placeholders
     non_none_children = [
         c for c in getattr(expression, "children", []) if c is not None
@@ -536,8 +534,6 @@ def _operator_chain_based_expression_to_str(expression: Tree) -> str:
 
 
 def _standalone_call_to_str(call: Tree) -> str:
-    from lark import Token as LarkToken
-
     # Filter out None children (from maybe_placeholders)
     non_none = [c for c in call.children if c is not None]
     callee = expression_to_str(non_none[0]) if len(non_none) > 0 else "?"
@@ -563,8 +559,6 @@ def _standalone_call_to_str(call: Tree) -> str:
 
 
 def _primary_to_str(primary: Tree) -> str:
-    from lark import Token as LarkToken
-
     # Primary expressions may have tokens (parens) mixed with sub-expressions
     # Filter out None children and format the non-token content
     parts = []
@@ -576,8 +570,6 @@ def _primary_to_str(primary: Tree) -> str:
 
 
 def _postfix_to_str(postfix: Tree) -> str:
-    from lark import Token as LarkToken
-
     # Postfix expressions: base_expr call_suffix | base_expr [expr] | etc.
     parts = []
     for c in postfix.children:
@@ -590,8 +582,6 @@ def _postfix_to_str(postfix: Tree) -> str:
 
 def _call_suffix_to_str(call_suffix: Tree) -> str:
     # Format call suffix (parenthesized args after function name)
-    from lark import Token as LarkToken
-
     parts = []
     for c in getattr(call_suffix, "children", []):
         if c is None:
@@ -606,13 +596,15 @@ def _call_suffix_to_str(call_suffix: Tree) -> str:
 
 
 def _arguments_from_tree(args_tree: Tree) -> str:
-    from .expression_utils import is_any_comma  # noqa: F821
-
     elements = []
     for c in getattr(args_tree, "children", []):
         if c is None:
             continue
-        if not isinstance(c, Token) and hasattr(c, "data") and str(_tree_data_str(c)).lower() != "trailing_comma":  # type: ignore
+        if (
+            not isinstance(c, Token)
+            and hasattr(c, "data")
+            and str(_tree_data_str(c)).lower() != "trailing_comma"
+        ):  # type: ignore
             elements.append(standalone_expression_to_str(c))
     return ", ".join(elements)
 
@@ -652,7 +644,7 @@ def _annotation_args_to_str(annotation: Tree) -> str:
     return "({}{})".format(", ".join(elements), trailing)
 
 
-def _lambda_to_str(a_lambda: Tree) -> str:
+def _lambda_to_str(a_lambda: Tree) -> str:  # noqa: C901
     """Format a lambda expression from the new flat grammar structure.
 
     For short lambdas, produces inline format: func(params): body
@@ -760,7 +752,7 @@ def _lambda_to_str(a_lambda: Tree) -> str:
                 lines.append(pname)
                 lines.append(")" + return_type_str + ":")
             else:
-                lines.append(f")")
+                lines.append(")")
 
     # Format body statements (each on its own indented line)
     indent_str = "\t"  # We'll adjust indentation in context
@@ -798,7 +790,6 @@ def _check_trailing_comma_in_array(array: Tree) -> bool:
     Without trailing comma: last child is Tree(expr).
     """
     from .expression_utils import has_trailing_comma as orig_has_tc
-    from lark import Token
 
     # Direct check on the array itself (old grammar with trailing_comma tree)
     if orig_has_tc(array):
@@ -872,7 +863,7 @@ def _array_to_str(array: Tree) -> str:
 
 
 def _dict_to_str(a_dict: Tree) -> str:
-    from .expression_utils import is_any_comma, has_trailing_comma  # noqa: F821
+    from .expression_utils import is_any_comma  # noqa: F821
 
     # Find the entries subtree if present (grammar wraps entries in this node)
     entries_tree = None
@@ -925,7 +916,7 @@ def _subscription_to_str(subscription: Tree) -> str:
     for child in getattr(subscription, "children", []):
         if isinstance(child, Token):
             ttype = str(child.type).lower()
-            if ttype == "bracket_open" or ttype == "bracket_close":
+            if ttype in ("bracket_open", "bracket_close"):
                 continue
         elif hasattr(child, "data"):
             expr = child
@@ -941,8 +932,6 @@ def _subscription_to_str(subscription: Tree) -> str:
 
 def _format_subscription_expr(node: Tree) -> str:
     """Format an expression for use inside a subscript, avoiding full recursion."""
-    from .expression_utils import remove_outer_parentheses  # noqa: F821
-
     # Try to unwrap wrapper trees (assignment/cast/ternary/type_test) first
     unwrapped = _unwrap_wrappers(node)
     if unwrapped is not None and unwrapped != node:
@@ -1200,7 +1189,7 @@ def _statement_to_str(node) -> str:
     return " ".join(texts) if texts else expression_to_str(node)
 
 
-def _suite_to_inline_str(suite: Tree) -> str:
+def _suite_to_inline_str(suite: Tree) -> str:  # noqa: C901
     """Format a suite as an inline string for lambda expressions.
 
     For single statements, returns the formatted statement directly.
@@ -1276,7 +1265,7 @@ def _suite_to_inline_str(suite: Tree) -> str:
                 parts.append(val)
         elif kind == "pass":
             parts.append("pass")
-        elif kind == "stmt" or kind == "expr":
+        elif kind in ("stmt", "expr"):
             try:
                 part_str = _statement_to_str(node)
                 parts.append(part_str)
@@ -1286,7 +1275,7 @@ def _suite_to_inline_str(suite: Tree) -> str:
     return " ".join(parts)
 
 
-def _extract_suite_statements(suite: Tree) -> list:
+def _extract_suite_statements(suite: Tree) -> list:  # noqa: C901
     """Extract formatted statement strings from a suite tree for multiline lambda body.
 
     Returns a list of string representations for each statement in the suite,
@@ -1522,7 +1511,7 @@ def _is_paren_expr(node: Tree) -> bool:
     children = [c for c in getattr(node, "children", []) if c is not None]
     if len(children) != 3:
         return False
-    first, middle, last = children[0], children[1], children[2]
+    first, last = children[0], children[2]
     # Check LPAR ... expr ... RPAR pattern
     if (
         isinstance(first, Token)
@@ -1619,11 +1608,12 @@ def _format_paren_expr(node: Tree) -> str:
     return f"({inner_str})"
 
 
-def _format_get_node_expr(node: Tree) -> str:
+def _format_get_node_expr(node: Tree) -> str:  # noqa: C901
     """Format get_node_expr for node paths like $Path/To, %Unique/Child.
 
     Grammar (new Earley grammar):
-        get_node_expr: DOLLAR (SLASH | PERCENT)? node_path_segment ((SLASH | PERCENT) node_path_segment)*
+        get_node_expr: DOLLAR (SLASH | PERCENT)? node_path_segment
+                       ((SLASH | PERCENT) node_path_segment)*
                      | PERCENT node_path_segment ((SLASH | PERCENT) node_path_segment)*
 
     With maybe_placeholders=True, children may include None placeholders.
@@ -1637,7 +1627,6 @@ def _format_get_node_expr(node: Tree) -> str:
     has_dollar = False
     has_percent = False
     has_leading_slash = False  # Detect $/root pattern (absolute path)
-    prefix = "$"
 
     if isinstance(first_child, Token):
         ft = str(getattr(first_child, "type", "")).upper()
@@ -1649,7 +1638,6 @@ def _format_get_node_expr(node: Tree) -> str:
     # Check for $/root pattern (SLASH immediately after DOLLAR)
     if len(non_none) >= 3:
         second_child = non_none[1]
-        third_child = non_none[2]
         if (
             isinstance(first_child, Token)
             and str(getattr(first_child, "type", "")).upper() == "DOLLAR"
@@ -1813,7 +1801,7 @@ def _format_primary_with_paren_removal(node: Tree) -> str:
         if isinstance(c, Token):
             ttype = str(getattr(c, "type", "")).upper()
             # Skip paren tokens - we handle them above
-            if ttype == "PARENTHESIS_OPEN" or ttype == "PARENTHESIS_CLOSE":
+            if ttype in ("PARENTHESIS_OPEN", "PARENTHESIS_CLOSE"):
                 continue
             result_parts.append(str(getattr(c, "value", "")))
         elif hasattr(c, "data"):
@@ -1856,7 +1844,7 @@ def _format_factor_expr(node: Tree) -> str:
     # format as a single node path (no spaces around /)
     if first_has_getnode and slash_indices:
         parts = []
-        for i, child in enumerate(non_none):
+        for _, child in enumerate(non_none):
             if (
                 _has_get_node_expr(child)
                 or isinstance(child, Token)
@@ -2007,7 +1995,7 @@ def _passthrough(node):
     return "?"
 
 
-def _format_sign(node: Tree) -> str:
+def _format_sign(node: Tree) -> str:  # noqa: C901
     """Format unary sign expressions (+/- prefix operators).
 
     Grammar structure: sign: (PLUS | MINUS) sign | bit_not | power
@@ -2099,7 +2087,8 @@ def _format_intermediate_expr(node: Tree) -> str:
             for c in non_none
         )
         if has_if:
-            # Find expr_if (first Tree child), IF token, expr_then (second Tree child after IF), ELSE token, expr_else
+            # Find expr_if (first Tree child), IF token, expr_then (second Tree child
+            # after IF), ELSE token, expr_else
             tree_children = [c for c in non_none if isinstance(c, Tree)]
             if len(tree_children) >= 3:
                 expr_if = expression_to_str(tree_children[0])
@@ -2130,26 +2119,6 @@ def _format_intermediate_expr(node: Tree) -> str:
             # This matches the legacy gdformat behavior exactly.
             if op_str == "+":
                 # Check what kind of value follows: number/literal vs identifier
-                second_data = (
-                    getattr(getattr(second, "data", None), "value", str(second.data))
-                    if hasattr(getattr(second, "data", None), "value")
-                    else str(second.data)
-                )
-                is_numeric_or_literal = (
-                    second_data == "type_test"
-                    and len(
-                        [
-                            c
-                            for c in getattr(second, "children", [])
-                            if isinstance(c, Token)
-                            and not any(
-                                x in str(getattr(c, "type", "")).upper()
-                                for x in ("NONE", "")
-                            )
-                        ]
-                    )
-                    >= 1
-                )
                 # If the inner value is a plain number/string/null literal, keep unary +
                 if _is_simple_expression(expr_str):
                     inner = (
@@ -2344,8 +2313,6 @@ def _dict_entry_from_children(node: Tree) -> str:
     With maybe_placeholders=True, tokens appear as string placeholders ("." or "=").
     Preserves the original separator (::= or =) from the source.
     """
-    from .expression_utils import is_any_comma  # noqa: F821
-
     non_none = [c for c in getattr(node, "children", []) if c is not None]
 
     if len(non_none) == 0:
@@ -2383,7 +2350,7 @@ def _dict_entry_from_children(node: Tree) -> str:
     sep_text = " = " if separator == "=" else ": "
 
     # Find value expression after separator
-    if value_idx > 0 and value_idx < len(non_none):
+    if 0 < value_idx < len(non_none):
         value = non_none[value_idx]
         if not isinstance(value, Token) and hasattr(value, "data"):
             return f"{key_expr}{sep_text}{standalone_expression_to_str(value)}"
@@ -2427,8 +2394,6 @@ def _annotation_to_type_str(node: Tree) -> str:
 
 
 def _tree_data_str(node) -> str:
-    from lark import Tree
-
     if isinstance(node, Tree):
         d = node.data
         return str(d) if not hasattr(d, "value") else d.value  # type: ignore

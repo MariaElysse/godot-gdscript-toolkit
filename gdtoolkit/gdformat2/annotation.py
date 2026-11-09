@@ -1,13 +1,11 @@
 """Format a GDScript decorator annotation expression."""
-from typing import List, Tuple, Optional
-
 from lark import Tree, Token
 
 from ..common.utils import get_line, get_end_line
-from .types import FormattedLines, Outcome
+from .types import Outcome
 
 
-def format_annotation(
+def format_annotation(  # noqa: C901
     statement: Tree,
     indent_string: str,
     indent_level: int,
@@ -182,11 +180,9 @@ def format_annotation(
         for ln in sorted(arg_comments):
             content_comments.extend(arg_comments[ln])
         suffix = _suffix(content_comments + stray)
-        if (
-            suffix
-            and inner_width + len(joined) + len(suffix) > max_len
-            and inner_width + len(suffix.strip()) <= max_len
-        ):
+        joined_with_suffix = inner_width + len(joined) + len(suffix)
+        own_line_width = inner_width + len(suffix.strip())
+        if suffix and joined_with_suffix > max_len >= own_line_width:
             lines.append((None, f"{inner_indent}{joined}"))
             lines.append((None, f"{inner_indent}{'  '.join(content_comments + stray)}"))
         else:
@@ -262,8 +258,6 @@ def _get_comment_text(comment_node: Tree) -> str:
 
 def _tree_data_str(node) -> str:
     """Return a tree's rule name as a plain string."""
-    from lark import Tree
-
     if isinstance(node, Tree):
         d = node.data
         return str(d) if not hasattr(d, "value") else d.value

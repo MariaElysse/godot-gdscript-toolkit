@@ -115,16 +115,19 @@ GDFORMAT2_GUIDE_DIVERGENCES: Dict[str, str] = {
     # "Keep individual lines of code under 100 characters": the golden puts a merged inline
     # comment after an already-long argument (122 and 115 columns), where gdformat2 moves the
     # comment to a line of its own, because the comment alone is what pushes the line over.
-    "multiline_annotations_w_comments": "line length: an overflowing annotation comment moves off the line",
+    "multiline_annotations_w_comments": "line length: an overflowing annotation comment "
+    "moves off the line",
     # Line length again, on a match pattern: the golden joins a call pattern's arguments on
     # one 179-column line, where gdformat2 breaks them, laying an argument that is itself
     # wider than a line out in place. The fixture also carries the multiline trailing comma
     # the canon map used to absorb, which `_guide_collapse` absorbs through the canon.
-    "multiline_match_statements": "line length: a call pattern's arguments break, and a multiline trailing comma",
+    "multiline_match_statements": "line length: a call pattern's arguments break, "
+    "and a multiline trailing comma",
     # A dot chain whose base is itself wider than a line: the golden keeps a 112-column first
     # line because a lambda in the chain exempts it from the fit test, where gdformat2 breaks
     # the chain per segment. The lambda only exempts its own lines.
-    "bug_326_multistatement_lambda_corner_case_workaround": "line length: a dot chain with a too-wide base breaks per segment",
+    "bug_326_multistatement_lambda_corner_case_workaround": "line length: a dot chain "
+    "with a too-wide base breaks per segment",
     "addition_n_subtraction_expressions": "continuation lines indented two levels",
     # A multiline collection packs its items on one continuation line while they fit,
     # closing with the trailing comma the guide asks of a multiline list. The golden leaves
@@ -177,10 +180,13 @@ GDFORMAT2_GUIDE_DIVERGENCES: Dict[str, str] = {
     "type_cast_corner_case_expressions": "continuation lines indented two levels",
     "variadic_functions": "continuation lines indented two levels",
     "complex_dot_chains": "continuation lines indented two levels; single-line dict brace spacing",
-    "complex_function_definitions": "continuation lines indented two levels; multiline trailing comma",
-    "if_corner_case": "continuation lines indented two levels; boolean operators converted to and/or/not",
+    "complex_function_definitions": "continuation lines indented two levels; "
+    "multiline trailing comma",
+    "if_corner_case": "continuation lines indented two levels; boolean "
+    "operators converted to and/or/not",
     "long_unistatement_lambdas": "continuation lines indented two levels; multiline trailing comma",
-    "parentheses_expressions_removal": "continuation lines indented two levels; single-line dict brace spacing; multiline trailing comma",
+    "parentheses_expressions_removal": "continuation lines indented two levels; "
+    "single-line dict brace spacing; multiline trailing comma",
 }
 
 

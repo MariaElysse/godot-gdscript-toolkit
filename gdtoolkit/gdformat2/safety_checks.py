@@ -6,7 +6,6 @@ Three validation layers after formatting:
 3. Comment persistence — all comments preserved in formatted output
 """
 import difflib
-from typing import Optional
 
 from lark import Token, Tree, Transformer
 
@@ -36,124 +35,86 @@ class LoosenTreeTransformer(Transformer):
         its wrapper depending on which rule ran. `?primary` inlines the single-child forms,
         so the only `primary` node that reaches the transformer is the `( expression )` form.
         """
-        from lark import Token as LarkToken
-        from lark import Tree as LarkTree
-
         if (
             len(args) == 3
-            and isinstance(args[0], LarkToken)
-            and isinstance(args[2], LarkToken)
+            and isinstance(args[0], Token)
+            and isinstance(args[2], Token)
             and str(args[0]) == "("
             and str(args[2]) == ")"
         ):
             return args[1]
-        return LarkTree("primary", args)
+        return Tree("primary", args)
 
     def comment(self, args):
         """Compare comment *text* canonically, since the guide's spacing rule rewrites it.
 
         `#text` becomes `# text` on formatting, which is a required change rather than a
-        semantic one. What a comment says is checked by `check_comment_persistence`.
+        What a comment says is checked by `check_comment_persistence`.
         """
-        from lark import Token as LarkToken
-        from lark import Tree as LarkTree
         from .comments import normalize_comment
 
         canonical = []
         for arg in args:
-            if isinstance(arg, LarkToken):
-                canonical.append(LarkToken(str(arg.type), normalize_comment(str(arg))))
+            if isinstance(arg, Token):
+                canonical.append(Token(str(arg.type), normalize_comment(str(arg))))
             else:
                 canonical.append(arg)
-        return LarkTree("comment", canonical)
+        return Tree("comment", canonical)
 
     def asless_actual_neg_expr(self, args):
-        from lark import Token as LarkToken
-        from lark import Tree as LarkTree
-
-        if isinstance(args[1], LarkToken) and str(args[1].type) == "NUMBER":  # type: ignore
-            return LarkToken("NUMBER", f"-{args[1].value}")  # type: ignore
-        return LarkTree("asless_actual_neg_expr", args)
+        if isinstance(args[1], Token) and str(args[1].type) == "NUMBER":  # type: ignore
+            return Token("NUMBER", f"-{args[1].value}")  # type: ignore
+        return Tree("asless_actual_neg_expr", args)
 
     def asless_comparison(self, args):
-        from lark import Tree as LarkTree
-
-        return LarkTree("comparison", args)
+        return Tree("comparison", args)
 
     def asless_and_test(self, args):
-        from lark import Tree as LarkTree
-
-        return LarkTree("and_test", args)
+        return Tree("and_test", args)
 
     def asless_or_test(self, args):
-        from lark import Tree as LarkTree
-
-        return LarkTree("or_test", args)
+        return Tree("or_test", args)
 
     def asless_bitw_or(self, args):
-        from lark import Tree as LarkTree
-
-        return LarkTree("bitw_or", args)
+        return Tree("bitw_or", args)
 
     def asless_bitw_xor(self, args):
-        from lark import Tree as LarkTree
-
-        return LarkTree("bitw_xor", args)
+        return Tree("bitw_xor", args)
 
     def asless_bitw_and(self, args):
-        from lark import Tree as LarkTree
-
-        return LarkTree("bitw_and", args)
+        return Tree("bitw_and", args)
 
     def asless_shift_expr(self, args):
-        from lark import Tree as LarkTree
-
-        return LarkTree("shift_expr", args)
+        return Tree("shift_expr", args)
 
     def asless_type_test(self, args):
-        from lark import Tree as LarkTree
-
-        return LarkTree("type_test", args)
+        return Tree("type_test", args)
 
     def asless_content_test(self, args):
-        from lark import Tree as LarkTree
-
-        return LarkTree("content_test", args)
+        return Tree("content_test", args)
 
     def asless_test_expr(self, args):
-        from lark import Tree as LarkTree
-
-        return LarkTree("test_expr", args)
+        return Tree("test_expr", args)
 
     def asless_arith_expr(self, args):
-        from lark import Tree as LarkTree
-
-        return LarkTree("arith_expr", args)
+        return Tree("arith_expr", args)
 
     def asless_mdr_expr(self, args):
-        from lark import Tree as LarkTree
-
-        return LarkTree("mdr_expr", args)
+        return Tree("mdr_expr", args)
 
     def asless_pow_expr(self, args):
-        from lark import Tree as LarkTree
-
-        return LarkTree("pow_expr", args)
+        return Tree("pow_expr", args)
 
     def signal_stmt(self, args):
-        from lark import Tree as LarkTree
-
         if len(args) > 1 and (
             not hasattr(args[1], "children") or len(args[1].children) == 0
         ):
-            return LarkTree("signal_stmt", args[:-1])
-        return LarkTree("signal_stmt", args)
+            return Tree("signal_stmt", args[:-1])
+        return Tree("signal_stmt", args)
 
     def start(self, args):
-        from lark import Tree as LarkTree
-
         # Filter out annotation and property_body_def nodes (handled separately by parser)
-        return LarkTree(
+        return Tree(
             "start",
             [
                 arg
@@ -165,17 +126,18 @@ class LoosenTreeTransformer(Transformer):
         )
 
     def class_def(self, args):
-        from lark import Tree as LarkTree
-
-        return LarkTree(
+        return Tree(
             "class_def",
-            [arg for arg in args if not isinstance(arg, Tree) or str(arg.data).startswith("class_member")],  # type: ignore
+            [
+                arg
+                for arg in args
+                if not isinstance(arg, Tree)
+                or str(arg.data).startswith("class_member")  # type: ignore
+            ],
         )
 
     def inner_class(self, args):
-        from lark import Tree as LarkTree
-
-        return LarkTree(
+        return Tree(
             "inner_class",
             [
                 arg for arg in args if not isinstance(arg, Tree)

@@ -1,8 +1,5 @@
-from typing import Dict, Callable
-
 from lark import Tree, Token
 
-from ..common.utils import get_line, get_end_line
 from .context import ExpressionContext
 from .expression_utils import continuation_indent_for
 from .style_config import StyleConfig
@@ -11,7 +8,7 @@ from .expression import format_expression
 from .statement_utils import format_simple_statement
 
 
-def format_var_statement(
+def format_var_statement(  # noqa: C901
     statement: Tree, indent_string: str, indent_level: int, style=None, prefix: str = ""
 ) -> Outcome:
     """Format a variable declaration.
@@ -19,10 +16,9 @@ def format_var_statement(
     Handles both class-level variables (variable_decl) and local variables
     (local_variable in the new grammar).
 
-    New grammar structure for local_variable: VAR NAME [EQUAL expression] | VAR NAME COLON type [EQUAL expression]
+    New grammar structure for local_variable: VAR NAME [EQUAL expression] |
+    VAR NAME COLON type [EQUAL expression]
     """
-    stmt_data = _tree_data_str(statement).lower()
-
     # A property (`var x: set = _set, get = _get`) renders as a header plus one accessor
     # per line, so it takes its own path before the plain declaration shapes below. The
     # inline list arrives as a `property`/`untitled_property` child; the block form puts
@@ -45,7 +41,6 @@ def format_var_statement(
 
     # Determine what kind of variable this is based on children
     has_colon_after_name = False
-    has_type = False
     has_equals = False
     uses_inference_operator = False  # Track if := was detected
 
@@ -68,7 +63,7 @@ def format_var_statement(
 
     # If COLON comes immediately before EQUAL (no type between them), it's := inference
     has_colon_after_name = False
-    if colon_pos >= 0 and equal_pos > colon_pos:
+    if 0 <= colon_pos < equal_pos:
         # Check if there's a non-token child between colon and equal (= the type)
         # Also check children[colon_pos+1] directly since trees can sit at that position
         children_list = list(getattr(statement, "children", []))
@@ -87,12 +82,11 @@ def format_var_statement(
         # If no type between colon and equals, treat as := inference (preserved in output)
         if not has_type_between:
             uses_inference_operator = True  # Mark that we detected :=
-            tokens_in_order = [
-                t
-                for t in tokens_in_order[:colon_pos]
+            tokens_in_order = list(
+                tokens_in_order[:colon_pos]
                 + ["equal"]
                 + tokens_in_order[equal_pos + 1 :]
-            ]
+            )
         else:
             has_colon_after_name = True
     elif colon_pos >= 0:
@@ -135,7 +129,10 @@ def format_var_statement(
 
     # Find NAME token for variable name
     for child in getattr(statement, "children", []):  # type: ignore
-        if isinstance(child, Token) and str(_tree_data_str(child)).lower() == "name":  # type: ignore
+        if (
+            isinstance(child, Token)
+            and str(_tree_data_str(child)).lower() == "name"  # type: ignore
+        ):
             name_token = child.value  # type: ignore
             break
 
@@ -163,11 +160,6 @@ def format_var_statement(
 
     if has_colon_after_name:
         # Typed variable declaration: VAR NAME COLON TYPE [EQUAL expr]
-        type_idx = (
-            tokens_in_order.index("colon") + 1 if "colon" in tokens_in_order else -1
-        )
-        equal_idx = tokens_in_order.index("equal") if "equal" in tokens_in_order else -1
-
         # Find the actual TYPE token (comes after COLON)
         children_list = list(getattr(statement, "children", []))  # type: ignore
         for i, c in enumerate(children_list):
@@ -258,10 +250,8 @@ def _safe_str(node):
         non_none_children = [c for c in children if c is not None]
 
         # For `type` trees: use expression_to_str to handle generics like Array[int]
-        if data_str == "type" or data_str == "return_type":
+        if data_str in ("type", "return_type"):
             try:
-                from .expression import format_expression  # noqa: F401 local import
-
                 return _type_tree_to_str(node)
             except Exception:
                 pass
@@ -678,9 +668,7 @@ def _suite_owner(prop, name):
 
 
 def _tree_data_str(node) -> str:
-    from lark import Tree as LarkTree
-
-    if isinstance(node, LarkTree):
+    if isinstance(node, Tree):
         d = node.data
         return str(d) if not hasattr(d, "value") else d.value  # type: ignore
     elif isinstance(node, Token):

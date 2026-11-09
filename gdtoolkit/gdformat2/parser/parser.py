@@ -6,9 +6,8 @@ Comments are collected by the postlexer and attached into the tree at their
 correct positions via :py:func:`attach_comments`.
 """
 import os
-from importlib.metadata import version as pkg_version
 
-from lark import Lark, Token, Tree
+from lark import Lark, Tree
 
 from .indenter import GDScriptIndenter
 from .comments import attach_comments
@@ -81,12 +80,12 @@ class Parser:
 
         # Earley doesn't support caching — skip cache dir entirely
         # Match GDScriptParser pattern exactly for lexer/callback setup
-        options = dict(
-            parser="earley",
-            ambiguity="resolve",
-            propagate_positions=True,
-            maybe_placeholders=True,
-        )
+        options = {
+            "parser": "earley",
+            "ambiguity": "resolve",
+            "propagate_positions": True,
+            "maybe_placeholders": True,
+        }
         callbacks: dict = {}
         callbacks["COMMENT"] = self.indenter.collect_comment
         options.update(

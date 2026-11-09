@@ -20,11 +20,12 @@ def format_const_statement(
 
     # Emit standalone comment children first
     for child in getattr(statement, "children", []):
-        from lark import Tree as LarkTree
-
-        if isinstance(child, LarkTree) and _tree_data_str(child) == "comment":
+        if isinstance(child, Tree) and _tree_data_str(child) == "comment":
             comment_text = _get_comment_text(child)
-            return ([(get_line(child), f"{indent_string}{comment_text}")], get_end_line(statement))  # type: ignore
+            return (
+                [(get_line(child), f"{indent_string}{comment_text}")],
+                get_end_line(statement),
+            )  # type: ignore
 
     handlers = {
         "const_assigned": _format_const_statement,
@@ -35,7 +36,7 @@ def format_const_statement(
     return handler(statement, children_list, indent_string, indent_level, style)
 
 
-def _format_const_statement(
+def _format_const_statement(  # noqa: C901
     statement: Tree, children_list, indent_string: str, indent_level: int, style=None
 ) -> Outcome:
     """Format a constant declaration for the new flat grammar.
@@ -160,8 +161,6 @@ def _format_const_statement(
 
 def _tree_data_str(node):
     """Return a tree's rule name as a plain string."""
-    from lark import Tree
-
     if isinstance(node, Tree):
         d = node.data
         return d.value if hasattr(d, "value") else str(d)
@@ -170,7 +169,6 @@ def _tree_data_str(node):
 
 def _get_comment_text(comment_node) -> str:
     """Extract the text content from a comment tree node."""
-    from lark import Tree
     from .comments import normalize_comment
 
     if not isinstance(comment_node, Tree):

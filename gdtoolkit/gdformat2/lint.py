@@ -45,7 +45,10 @@ from lark import Token, Tree
 
 from .parser import parser as _parser
 
-GUIDE_BASE_URL = "https://docs.godotengine.org/en/stable/tutorials/scripting/gdscript/gdscript_styleguide.html"
+GUIDE_BASE_URL = (
+    "https://docs.godotengine.org/en/stable/tutorials/scripting/gdscript/"
+    "gdscript_styleguide.html"
+)
 
 # The guide's own code order ("Code order"), used both to rank a declaration and to tell the
 # reader the order they should have written. Every entry is (key, label).

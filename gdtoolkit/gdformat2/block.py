@@ -173,7 +173,7 @@ def _render_annotations_standalone(annotations, indent_string, indent_level, sty
     out: list = []
     for ann, text in annotations:
         ann_lines, _ = format_annotation(ann, indent_string, indent_level, style)
-        ann_lines = [l for l in ann_lines if isinstance(l, tuple)]
+        ann_lines = [ln for ln in ann_lines if isinstance(ln, tuple)]
         if text and ann_lines:
             first = ann_lines[0]
             ann_lines[0] = (first[0], f"{first[1]}  {text}")
@@ -222,7 +222,7 @@ def _join_annotations(clean_lines, annotations, style, indent_string, indent_lev
     )
 
 
-def format_block(
+def format_block(  # noqa: C901
     statements: List[Any],
     statement_formatter: Callable,
     context_indent_string: str,
@@ -242,12 +242,6 @@ def format_block(
         return ([], context_indent_level)
 
     prev_end_line = get_line_safe(statements[0]) if statements else context_indent_level
-
-    # Track the last declaration type at this scope level for blank line rules.
-    # This is more reliable than _last_statement_type which can be confused by
-    # nested body content (e.g., 'pass' inside a class being mistaken as the
-    # previous declaration instead of 'inner_class').
-    prev_declared_type = ""
 
     # Annotations that should end up on the same line as the declaration they
     # decorate are held here until that declaration is rendered. Inside a
@@ -275,7 +269,8 @@ def format_block(
 
     for i, item in enumerate(statements):
         actual_node = item
-        inline_comment = None  # Optional inline comment to append (3-tuple format: tag, node, inline_comment)
+        # Optional inline comment to append (3-tuple format: tag, node, inline_comment)
+        inline_comment = None
 
         # Check for comment marker first
         is_comment_item = False
@@ -289,13 +284,6 @@ def format_block(
                 is_comment_item = True
             elif tag == "__root_comment__":
                 is_comment_item = True
-
-        # Always get the statement type from the actual node (even for comments)
-        # This ensures blank line rules work correctly based on what comes before/after
-        stmt_data_str = _get_stmt_type_from_node(actual_node)
-        # If it's a comment, use "comment" as the next_name instead of empty string
-        if is_comment_item:
-            stmt_data_str = "comment"
 
         # Determine if we're at global scope (indent level 0 means top-level file items)
         is_nested = context_indent_level > 0
@@ -391,7 +379,7 @@ def format_block(
                 lines, last_processed_line_no = result  # type: ignore
 
             # Filter out any non-tuple entries from lines (safety check)
-            clean_lines = [l for l in lines if isinstance(l, tuple)]
+            clean_lines = [ln for ln in lines if isinstance(ln, tuple)]
 
             # The declaration's own inline comment belongs on its line, so attach
             # it before any annotation join (which may reorder the first line). A
@@ -408,7 +396,7 @@ def format_block(
 
                 limit = style.line_length if style else 100
                 own_line = f"{context_indent_string}{inline_comment}"
-                if _display_width(joined) > limit and _display_width(own_line) <= limit:
+                if _display_width(joined) > limit >= _display_width(own_line):
                     clean_lines[-1] = (clean_lines[-1][0], text)
                     clean_lines.append((None, own_line))
                 else:
@@ -428,10 +416,11 @@ def format_block(
 
             formatted_lines += clean_lines
 
-            prev_end_line = last_processed_line_no if last_processed_line_no and isinstance(last_processed_line_no, int) else get_end_line_safe(actual_node)  # type: ignore
-
-            # Update the tracked declaration type for next iteration's blank rules
-            prev_declared_type = stmt_data_str
+            prev_end_line = (
+                last_processed_line_no
+                if last_processed_line_no and isinstance(last_processed_line_no, int)
+                else get_end_line_safe(actual_node)
+            )  # type: ignore
 
     return (formatted_lines, prev_end_line)
 
@@ -577,7 +566,6 @@ def _get_blank_lines(
 
     # --- Comment → same-type declaration: inherit preceding spacing ---
     if prev_name == "comment" and next_name in TOP_LEVEL_TYPES:
-        is_global = not is_nested_scope
         # Comments at global scope follow a special rule:
         # comment before function → 1 blank; comment before class/variable → 2 blanks
         if next_name in {"function_decl", "signal_decl"}:
@@ -676,7 +664,7 @@ def _is_top_level_transition(prev_name: str, next_name: str) -> bool:
 def get_line_safe(node) -> int:
     try:
         if isinstance(node, tuple):
-            tag, actual = node  # type: ignore
+            _, actual = node  # type: ignore
             from ..common.utils import get_line as _gl
 
             return _gl(actual)
@@ -707,8 +695,7 @@ def _content_end_line(node) -> int:
                 # A multi-line token (e.g. a triple-quoted string) reports its start
                 # line, so add the newlines it contains to get its end line.
                 ln += str(getattr(n, "value", "")).count("\n")
-                if ln > best:
-                    best = ln
+                best = max(best, ln)
             continue
         for c in getattr(n, "children", []):
             if c is not None:
@@ -719,7 +706,7 @@ def _content_end_line(node) -> int:
 def get_end_line_safe(node) -> int:
     try:
         if isinstance(node, tuple):
-            tag, actual = node  # type: ignore
+            _, actual = node  # type: ignore
             from ..common.utils import get_end_line as _gel
 
             return _gel(actual)

@@ -125,7 +125,13 @@ def test_code_order_ignores_comments_that_carry_no_order(source):
 
 def test_continuation_indent_wants_two_levels():
     """A block is reported once, at its first content line: the indent is the block's."""
-    source = "func f() -> void:\n\tcall_a_function(\n\t\tfirst_argument,\n\t\tsecond_argument\n\t)\n"
+    source = (
+        "func f() -> void:\n"
+        "\tcall_a_function(\n"
+        "\t\tfirst_argument,\n"
+        "\t\tsecond_argument\n"
+        "\t)\n"
+    )
     problems = [
         p
         for p in lint_code(source, filename="ok_name.gd")

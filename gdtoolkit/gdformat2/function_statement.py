@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Dict, Callable, Any, List, Tuple
+from typing import Dict, Callable, Any, List
 
 from lark import Tree, Token
 
@@ -97,7 +97,7 @@ def format_func_statement(
     # Unwrap tuple if needed (from block wrapper)
     actual_stmt = statement
     if isinstance(statement, tuple):
-        tag, actual_stmt = statement  # type: ignore
+        _tag, actual_stmt = statement  # type: ignore
 
     stmt_data = _tree_data_str(actual_stmt).lower()
 
@@ -152,7 +152,10 @@ def _format_function_call_expr(
     # Find call_suffix to get arguments
     args_str = ""
     for child in getattr(statement, "children", []):
-        if hasattr(child, "data") and str(_tree_data_str(child)).lower() == "call_suffix":  # type: ignore
+        if (
+            hasattr(child, "data")
+            and str(_tree_data_str(child)).lower() == "call_suffix"  # type: ignore
+        ):
             # Format the call_suffix content (parens + arguments)
             from .expression_to_str import expression_to_str as ets
 
@@ -196,7 +199,7 @@ def _format_expr_statement(
     expression_context = ExpressionContext(
         "", get_line_safe(statement), "", get_line_safe(statement)
     )
-    lines, end_line = format_expression(expr, expression_context, indent_string, style)
+    lines, _end = format_expression(expr, expression_context, indent_string, style)
     return (lines, get_end_line_safe(statement))
 
 
@@ -242,7 +245,7 @@ def _format_assignment_statement(
     from .expression_utils import strip_slot_parentheses
 
     rhs = strip_slot_parentheses(rhs, f"{lhs_str} {op} ", indent_string, style)
-    lines, end_line = format_expression(rhs, expression_context, indent_string, style)
+    lines, _end = format_expression(rhs, expression_context, indent_string, style)
     return (lines, get_end_line_safe(statement))
 
 
@@ -290,7 +293,7 @@ def _format_return_statement(
         expression_context = ExpressionContext(
             "return ", get_line_safe(statement), "", get_end_line_safe(statement)
         )
-        lines, end_line = format_expression(
+        lines, _end = format_expression(
             expr_node, expression_context, indent_string, style
         )
         return (lines, get_end_line_safe(statement))
@@ -402,7 +405,7 @@ def _format_if_elif_branch(
             ":",
             get_end_line_safe(expr_tree),
         )
-        header_lines, last_line_no = format_expression(
+        header_lines, _end = format_expression(
             expr_tree, expression_context, indent_string, style
         )
     else:
@@ -422,7 +425,7 @@ def _format_if_elif_branch(
             body_stmts = _extract_suite_body(suite_child)
             if body_stmts:
                 body_indent_string = _get_body_indent(style, indent_level)
-                body_lines, last_line_no = format_block(
+                body_lines, _end = format_block(
                     body_stmts,
                     format_func_statement,
                     body_indent_string,
@@ -460,7 +463,7 @@ def _format_else_header(
 
             if body_stmts:
                 body_indent_string = _get_body_indent(style, indent_level)
-                body_lines, last_line_no = format_block(
+                body_lines, _end = format_block(
                     body_stmts,
                     format_func_statement,
                     body_indent_string,
@@ -475,7 +478,7 @@ def _format_else_header(
     return formatted_lines
 
 
-def _extract_suite_body(suite_tree) -> list:
+def _extract_suite_body(suite_tree) -> list:  # noqa: C901
     """Extract statement children from a suite tree.
 
     Handles the grammar where suite contains suite_line nodes with actual statements,
@@ -483,8 +486,6 @@ def _extract_suite_body(suite_tree) -> list:
     and appends them to the member tuple.
     """
     # Build inline comment map for local variables first
-    from typing import Dict
-
     inline_comments: Dict[int, str] = {}
     suite_children = list(getattr(suite_tree, "children", []))
 
@@ -595,7 +596,8 @@ def _format_for_statement(
     """Format for/for_typed statements.
 
     Grammar: FOR NAME [COLON type] IN expression COLON suite
-    Children: [FOR_token, NAME_token?, COLON_token?, type_tree, IN_token, expr_tree, COLON_token, suite_tree]
+    Children: [FOR_token, NAME_token?, COLON_token?, type_tree, IN_token,
+    expr_tree, COLON_token, suite_tree]
     """
     children = getattr(statement, "children", [])  # type: ignore
     var_name = ""
@@ -610,7 +612,6 @@ def _format_for_statement(
             break  # Found IN; check for type between NAME and IN
 
     # Check for type annotation (COLON + tree between NAME position and IN position)
-    name_found = False
     if var_name:
         name_pos = -1
         for ci, cc in enumerate(children):
@@ -701,7 +702,7 @@ def _format_match_statement(
             line_no = get_line_safe(statement)
             end_line = get_end_line_safe(expr_tree)
             expression_context = ExpressionContext("match ", line_no, ":", end_line)
-            header_lines, last_line_no = format_expression(
+            header_lines, _end = format_expression(
                 expr_tree, expression_context, indent_string, style
             )
     else:
@@ -739,7 +740,7 @@ def _format_match_statement(
             body_stmts = _extract_suite_body(body_child)
             if body_stmts:
                 body_indent_string = _get_body_indent(style, indent_level + 1)
-                body_lines, last_line_no = format_block(
+                body_lines, _end = format_block(
                     body_stmts,
                     format_func_statement,
                     body_indent_string,
@@ -752,7 +753,7 @@ def _format_match_statement(
             body_stmts = _extract_match_body(body_child)
             if body_stmts:
                 body_indent_string = _get_body_indent(style, indent_level + 1)
-                body_lines, last_line_no = format_block(
+                body_lines, _end = format_block(
                     body_stmts,
                     format_func_statement,
                     body_indent_string,
@@ -767,7 +768,7 @@ def _format_match_statement(
 # ─── Branch helper ──────────────────────────────────────────────────────────
 
 
-def _format_branch(
+def _format_branch(  # noqa: C901
     prefix: str,
     suffix: str,
     expr_position: int | None,
@@ -812,7 +813,8 @@ def _format_branch(
         Handles the new grammar where suite/suite_line trees wrap actual statements:
           for_stmt -> [..., COLON, SUITE]
           suite    -> [_NL, _INDENT, suite_line*, _DEDENT]
-          suite_line -> [local_variable | pass_stmt | function_call_expr | compound_statement | ... | end?]
+          suite_line -> [local_variable | pass_stmt | function_call_expr |
+                         compound_statement | ... | end?]
         """
         stmts = []
         for child in children[start_offset:]:
@@ -944,9 +946,7 @@ def _extract_match_body(body_tree) -> list:
                 for sc in getattr(child, "children", []):
                     if isinstance(sc, Tree) and hasattr(sc, "data"):
                         idata = _tree_data_str(sc).lower()
-                        if idata == "suite_line" or (
-                            idata != "end" and idata != "comment"
-                        ):
+                        if idata == "suite_line" or idata not in ("end", "comment"):
                             stmts.append(("member", sc))
                     elif isinstance(sc, Token):
                         pass  # Skip tokens in nested suite
@@ -987,7 +987,7 @@ def format_match_branch_statement(
 ) -> Outcome:
     """Format a match branch (pattern: body)."""
     if isinstance(statement, tuple):
-        tag, actual_stmt = statement  # type: ignore
+        _tag, actual_stmt = statement  # type: ignore
     else:
         actual_stmt = statement
 
@@ -1090,7 +1090,7 @@ def _join_match_halves(pattern_lines, guard_lines, indent_string, max_len):
     )
 
 
-def _format_match_branch(
+def _format_match_branch(  # noqa: C901
     statement: Tree, indent_string: str, indent_level: int, style=None
 ) -> Outcome:
     """Format a single match branch.
@@ -1221,7 +1221,7 @@ def _format_match_branch(
             body_stmts = _extract_suite_body(body_child)
             if body_stmts:
                 body_indent_string = _get_body_indent(style, indent_level + 2)
-                body_lines, last_line_no = format_block(
+                body_lines, _end = format_block(
                     body_stmts,
                     format_func_statement,
                     body_indent_string,
@@ -1231,27 +1231,6 @@ def _format_match_branch(
                 formatted_lines.extend(body_lines)
 
     return (formatted_lines, get_end_line_safe(statement))
-
-
-# ─── Populate handlers after all functions are defined ──────────────────────
-
-_HANDLERS.update(
-    {
-        "local_variable": lambda s, i, l, st: format_var_statement(s, i, l, st),  # type: ignore
-        "constant_decl": lambda s, i, l, st: format_const_statement(s, i, l, st),  # type: ignore
-        "flow_stmt": _format_return_statement,  # Simplified - return is most common
-        "assert_stmt": _format_assert_statement,
-        "pass_stmt": partial(format_simple_statement, "pass"),
-        "expression_stmt": _format_expr_statement,
-        "function_call_expr": _format_function_call_expr,
-        "assignment_stmt": _format_assignment_statement,
-        "if_stmt": _format_if_statement,
-        "while_stmt": lambda s, i, l, st: _format_branch("while ", ":", 1, s, i, l, st),
-        "for_stmt": _format_for_statement,
-        "match_stmt": _format_match_statement,
-        "annotation": lambda s, i, l, st: _format_annotation_statement(s, i, l, st),
-    }
-)
 
 
 def _format_annotation_statement(
@@ -1324,9 +1303,30 @@ def _get_body_indent(style, current_level):
 
 
 def _tree_data_str(node) -> str:
-    from lark import Tree
-
     if isinstance(node, Tree):
         d = node.data
         return str(d) if not hasattr(d, "value") else d.value  # type: ignore
     return ""
+
+
+# ─── Populate handlers after all functions are defined ──────────────────────
+
+_HANDLERS.update(
+    {
+        "local_variable": format_var_statement,  # type: ignore
+        "constant_decl": format_const_statement,  # type: ignore
+        "flow_stmt": _format_return_statement,  # Simplified - return is most common
+        "assert_stmt": _format_assert_statement,
+        "pass_stmt": partial(format_simple_statement, "pass"),
+        "expression_stmt": _format_expr_statement,
+        "function_call_expr": _format_function_call_expr,
+        "assignment_stmt": _format_assignment_statement,
+        "if_stmt": _format_if_statement,
+        "while_stmt": lambda s, i, ln, st: _format_branch(
+            "while ", ":", 1, s, i, ln, st
+        ),
+        "for_stmt": _format_for_statement,
+        "match_stmt": _format_match_statement,
+        "annotation": _format_annotation_statement,
+    }
+)

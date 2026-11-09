@@ -1,16 +1,11 @@
-import io
 import subprocess
-import sys
-from contextlib import redirect_stdout
 
-import pytest
-
-from ..common import write_file
 from gdtoolkit.linter.problem_printer import (
     print_problem_github,
-    print_problem,
 )
 from gdtoolkit.linter.problem import Problem
+
+from ..common import write_file
 
 
 def test_valid_file_no_config(tmp_path):
@@ -183,8 +178,6 @@ def test_print_problem_github_no_commas_in_description(capsys):
     # The original commas from the description should become semicolons
     assert "This has; a comma; in it" in captured.out
     # But no raw commas from the original text (the ", line X" suffix is fine)
-    output_after_msg = captured.out.split("::error")[1]
-    msg_and_metadata = output_after_msg.split(")")[0] + ")"
     # Check that description commas are gone - look for semicolons instead
     assert "has, a" not in captured.out
     assert "a comma," not in captured.out

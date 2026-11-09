@@ -18,7 +18,8 @@ def print_problem_github(problem: Problem, file_path: str) -> None:
     """Output a lint problem as a GitHub workflow command.
 
     Produces lines like:
-      ::error file=script.gd,line=42,col=5::Function argument name \"x\" is not valid (function-argument-name)
+      ::error file=script.gd,line=42,col=5::Function argument name \"x\" is
+      not valid (function-argument-name)
 
     Written to stdout so GitHub Actions parses them as annotations.
     """

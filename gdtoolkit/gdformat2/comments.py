@@ -38,7 +38,11 @@ def _find_all_comments(tree: Tree) -> List[Tree]:
     comments = []
     for child in getattr(tree, "children", []):
         if isinstance(child, Tree):
-            data = str(child.data) if not hasattr(child.data, "value") else child.data.value  # type: ignore
+            data = (
+                str(child.data)
+                if not hasattr(child.data, "value")
+                else child.data.value
+            )  # type: ignore
             if data == "comment":
                 comments.append(child)
             elif hasattr(child, "data"):  # It's a non-comment tree node
