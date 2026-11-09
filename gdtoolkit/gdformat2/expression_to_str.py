@@ -2,7 +2,7 @@ from typing import List
 
 from lark import Tree, Token
 
-from .expression_utils import remove_outer_parentheses  # noqa: F401
+from .expression_utils import _strip_primary_parens, remove_outer_parentheses  # noqa: F401
 
 # The style guide prefers the plain English boolean operators.
 _BOOLEAN_OPERATOR_ALIASES = {'&&': 'and', '||': 'or', '!': 'not'}
@@ -146,15 +146,14 @@ def expression_to_str(expression):
         "call_suffix": _call_suffix_to_str,
         "arguments": lambda e: _arguments_from_tree(e),
         # Primary expressions (function calls, subscript, etc. with paren tokens)
-        "primary": _primary_to_str,
+        # (handled by the later "primary" entry - see _format_primary_with_paren_removal)
         # Old grammar types
         "expr": lambda e: standalone_expression_to_str(e.children[0]),
         "assnmnt_expr": _operator_chain_based_expression_to_str,
         "test_expr": _operator_chain_based_expression_to_str,
         "asless_test_expr": _operator_chain_based_expression_to_str,
-        "or_test": _operator_chain_based_expression_to_str,
+        # ("or_test"/"and_test" are mapped further down to _format_intermediate_expr)
         "asless_or_test": _operator_chain_based_expression_to_str,
-        "and_test": _operator_chain_based_expression_to_str,
         "asless_and_test": _operator_chain_based_expression_to_str,
         "asless_actual_not_test": lambda e: "{}{}{}".format(
             expression_to_str(e.children[0]),
@@ -162,9 +161,8 @@ def expression_to_str(expression):
             expression_to_str(e.children[1]),
         ),
         "not_in_op": lambda _: "not in",
-        "content_test": _operator_chain_based_expression_to_str,
+        # ("content_test"/"comparison" are mapped further down to _format_intermediate_expr)
         "asless_content_test": _operator_chain_based_expression_to_str,
-        "comparison": _operator_chain_based_expression_to_str,
         "asless_comparison": _operator_chain_based_expression_to_str,
         "bitw_or": _operator_chain_based_expression_to_str,
         "asless_bitw_or": _operator_chain_based_expression_to_str,
@@ -172,13 +170,11 @@ def expression_to_str(expression):
         "asless_bitw_xor": _operator_chain_based_expression_to_str,
         "bitw_and": _operator_chain_based_expression_to_str,
         "asless_bitw_and": _operator_chain_based_expression_to_str,
-        "shift_expr": _operator_chain_based_expression_to_str,
+        # ("shift_expr"/"arith_expr"/"mdr_expr"/"sign" are mapped further down to
+        # _format_intermediate_expr)
         "asless_shift_expr": _operator_chain_based_expression_to_str,
-        "arith_expr": _operator_chain_based_expression_to_str,
         "asless_arith_expr": _operator_chain_based_expression_to_str,
-        "mdr_expr": _operator_chain_based_expression_to_str,
         "asless_mdr_expr": _operator_chain_based_expression_to_str,
-        "sign": lambda e: _format_sign(e),
         "asless_actual_neg_expr": lambda e: f"-{expression_to_str(e.children[1])}",
         "asless_actual_bitw_not": lambda e: f"~{expression_to_str(e.children[1])}",
         "pow_expr": _operator_chain_based_expression_to_str,
@@ -279,26 +275,8 @@ def expression_to_str(expression):
                and str(getattr(e.children[0], 'type', '')).upper() == "VAR"
             else _passthrough(e)
         ),
-        # Dict pattern entry: key COLON value (not key = value like dict literals)
-        "dict_pattern_entry": lambda e: (
-            f"{expression_to_str(e.children[0])}: {expression_to_str(e.children[-1])}"
-            if len(getattr(e, 'children', [])) >= 2
-            else _passthrough(e)
-        ),
-        # Dict pattern items container (comma-separated dict_pattern_entry children)
-        "dict_pattern_items": lambda e: ", ".join(
-            expression_to_str(c) for c in getattr(e, 'children', [])
-            if c is not None and isinstance(c, Tree)
-        ),
-        # Array pattern items container (comma-separated match_pattern children,
-        # including PERIOD_PERIOD rest token)
-        "array_pattern_items": (
-            lambda e: ", ".join(
-                expression_to_str(c) for c in getattr(e, 'children', [])
-                if c is not None and isinstance(c, Tree)
-            )
-            + (", .." if any(isinstance(c, Token) and str(getattr(c, 'type', '')).upper() == "PERIOD_PERIOD" for c in getattr(e, 'children', [])) else "")
-        ),
+        # (dict_pattern_entry / dict_pattern_items / array_pattern_items are mapped
+        # further down to _dict_pattern_entry_to_str / _pattern_items_to_str)
         "list_pattern": lambda e: ", ".join(map(expression_to_str, e.children)),
         "test_pattern": _operator_chain_based_expression_to_str,
         "or_pattern": _operator_chain_based_expression_to_str,
@@ -441,10 +419,13 @@ def _operator_chain_based_expression_to_str(expression: Tree) -> str:
                                     parts.append(str(c.value))
                             elif hasattr(c, 'data'):
                                 try:
-                                    result = expression_to_str(c)
-                                    # Strip redundant outer parens from sub-expressions
-                                    stripped = remove_outer_parentheses(_parse_result_as_tree(result)) if isinstance(result, str) else result
-                                    parts.append(expression_to_str(stripped) if isinstance(stripped, Tree) else (str(result) if isinstance(result,str) else '?'))
+                                    # Strip redundant outer parens from sub-expressions:
+                                    # the sub-expression is the Tree itself (`c`); the
+                                    # redundant wrap, if any, is a `par_expr` or a
+                                    # paren-wrapped `primary` inside it. There is nothing
+                                    # to gain from re-parsing the formatted text.
+                                    stripped = _strip_primary_parens(remove_outer_parentheses(c))
+                                    parts.append(expression_to_str(stripped))
                                 except Exception:
                                     pass
                         inner_formatted = ''.join(parts)

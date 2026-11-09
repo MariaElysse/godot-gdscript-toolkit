@@ -869,7 +869,6 @@ def _check_file_name(context: _Context) -> List[Problem]:
     """The guide's snake_case file names, and a `class_name` that matches."""
     if not context.filename:
         return []
-    import os
 
     stem = os.path.splitext(os.path.basename(context.filename))[0]
     suggestions = []
@@ -986,8 +985,6 @@ _RUNNERS = (
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     """`python -m gdtoolkit.gdformat2.lint <path>...`"""
-    import os
-
     arguments = list(sys.argv[1:] if argv is None else argv)
     if "--list-checks" in arguments:
         for check in CHECKS:

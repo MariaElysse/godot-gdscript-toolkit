@@ -15,13 +15,6 @@ from .statement_utils import format_simple_statement
 from .comments import normalize_comment
 
 
-def _format_root_comment(s, ind, lvl, style=None): return None  # placeholder
-def _format_member_decl(s, i, l, st=None): return None  # placeholder
-def _format_variable_decl(s, i, l, st=None): return None  # placeholder
-def _format_signal_decl(s, i, l, st=None): return None  # placeholder
-def _format_enum_decl(s, i, l, st=None): return None  # placeholder
-def _format_func_decl(s, i, l, st=None): return None  # placeholder
-def _format_inner_class(s, i, l, st=None): return None  # placeholder
 def _format_annotation(statement: Tree, indent_string: str, indent_level: int, style=None) -> Outcome:
     """Format an annotation/decorator like @export_enum(...) or @tool."""
     from .annotation import format_annotation as _fmt
@@ -1014,7 +1007,6 @@ def _find_suite_or_empty(
         to format and orphaned_comments are comment nodes extracted for parent scope.
     """
     from lark import Tree as LarkTree
-    from typing import Dict, List
     
     # Build inline comment map for local variables first
     inline_comments: Dict[int, str] = {}

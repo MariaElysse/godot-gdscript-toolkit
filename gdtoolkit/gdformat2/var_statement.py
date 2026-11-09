@@ -5,6 +5,7 @@ from lark import Tree, Token
 from ..common.utils import get_line, get_end_line
 from .context import ExpressionContext
 from .expression_utils import continuation_indent_for
+from .style_config import StyleConfig
 from .types import Outcome
 from .expression import format_expression
 from .statement_utils import format_simple_statement

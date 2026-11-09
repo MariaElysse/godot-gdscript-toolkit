@@ -3,7 +3,7 @@
 Adapted from original gdtoolkit/formatter/expression.py to use tree-based
 comment handling instead of line-indexed arrays.
 """
-from typing import Dict, Callable, Optional
+from typing import Dict, Callable, List, Optional
 
 from lark import Tree, Token
 from lark.tree import Meta
@@ -14,6 +14,35 @@ from .expression_utils import (collection_indent, continuation_indent,
                                 continuation_indent_for)
 from .style_config import StyleConfig
 from .types import FormattedLines, Outcome
+
+
+def _extract_all_tokens(node, names: List[str]) -> None:
+    """Collect identifier-like Token values under *node*, recursing through Trees.
+
+    Lark Earley may report an empty .type, so identifiers are extracted by value,
+    filtering out dots, operators and symbols.
+    """
+    for child in getattr(node, 'children', []):
+        if isinstance(child, Token):
+            cval = str(getattr(child, 'value', '') or '')
+            # Keep identifiers (not dots, operators, symbols)
+            if cval and not any(c in cval for c in '+-*/%&|^~!@#\'"\\`{}[]():;,=<>') and cval != '.':
+                names.append(cval)
+        elif isinstance(child, Tree):
+            _extract_all_tokens(child, names)
+
+
+def _extract_attr_names(node, names: List[str]) -> None:
+    """Collect Token values one level under *node*, skipping PERIOD tokens."""
+    for child in getattr(node, 'children', []):
+        if isinstance(child, Token) and child.type == 'PERIOD':
+            continue
+        elif isinstance(child, Tree):
+            for sub_ch in getattr(child, 'children', []):
+                if isinstance(sub_ch, Token):
+                    val = str(getattr(sub_ch, 'value', '') or '')
+                    if val:
+                        names.append(val)
 
 
 def format_expression(
@@ -1173,17 +1202,8 @@ def _format_postfix_multi(
             elif _is_attribute(sc):
                 # Extract attribute names from tree - Lark Earley may report empty .type,
                 # so we extract identifiers by value filtering out symbols/operators
-                all_names = []
-                def _extract_all_tokens(node):
-                    for child in getattr(node, 'children', []):
-                        if isinstance(child, Token):
-                            cval = str(getattr(child, 'value', '') or '')
-                            # Keep identifiers (not dots, operators, symbols)
-                            if cval and not any(c in cval for c in '+-*/%&|^~!@#\'\"\\`{}[]():;,=<>') and cval != '.':
-                                all_names.append(cval)
-                        elif isinstance(child, Tree):
-                            _extract_all_tokens(child)
-                _extract_all_tokens(sc)
+                all_names: List[str] = []
+                _extract_all_tokens(sc, all_names)
                 parts.append('.' + '.'.join(all_names))
             elif _is_subscript(sc):
                 # Only the opening bracket participates in the base-chain width estimate;
@@ -1298,16 +1318,8 @@ def _format_postfix_multi(
                         if d == 'call_suffix' or d == 'subscript':
                             break
                         elif d in ('attribute', 'attribute_name'):
-                            all_names = []
-                            def _extract_all_tokens(node):
-                                for child in getattr(node, 'children', []):
-                                    if isinstance(child, Token):
-                                        cval = str(getattr(child, 'value', '') or '')
-                                        if cval and not any(c in cval for c in '+-*/%&|^~!@#\'"\\`{}[]():;,=<>') and cval != '.':
-                                            all_names.append(cval)
-                                    elif isinstance(child, Tree):
-                                        _extract_all_tokens(child)
-                            _extract_all_tokens(s)
+                            all_names: List[str] = []
+                            _extract_all_tokens(s, all_names)
                             open_chain += '.' + '.'.join(all_names)
                     elif isinstance(s, Token):
                         open_chain += str(s.value)
@@ -1491,17 +1503,8 @@ def _format_postfix_multi(
         attr_parts = []
         for s in seg:
             if _is_attribute(s):
-                names = []
-                def _extract_attr_names(node):
-                    for child in getattr(node, 'children', []):
-                        if isinstance(child, Token) and child.type == 'PERIOD':
-                            continue
-                        elif isinstance(child, Tree):
-                            for sub_ch in getattr(child, 'children', []):
-                                if isinstance(sub_ch, Token):
-                                    val = str(getattr(sub_ch, 'value', '') or '')
-                                    if val: names.append(val)
-                _extract_attr_names(s)
+                names: List[str] = []
+                _extract_attr_names(s, names)
                 attr_parts.extend(['.'] + names)
             elif isinstance(s, Token):
                 ttype = str(getattr(s, 'type', '')).upper()

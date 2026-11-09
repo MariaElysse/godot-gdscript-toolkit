@@ -2,7 +2,7 @@ import re
 from typing import Iterator, List
 from collections import defaultdict
 
-from lark.indenter import Indenter
+from lark.indenter import DedentError, Indenter
 from lark.lexer import Token
 
 _COMMENT_RE = re.compile(r"#[^\r\n]*")

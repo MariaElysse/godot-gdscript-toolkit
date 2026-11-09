@@ -232,7 +232,6 @@ def _extract_top_level(tree: Tree):
 def _attach_inline_to_previous(items, comment_node) -> bool:
     """If `comment_node` sits on the same line as the previous member or annotation
     item, turn that item into an inline-comment 3-tuple and return True."""
-    from lark import Token
     from .comments import normalize_comment
     from ..common.utils import get_end_line
 
@@ -265,7 +264,6 @@ def _last_code_line(node) -> int:
     trailing comment: the comment is on line 1 and the node claimed to end on line 2, so the
     inline check missed and the comment was emitted standalone.
     """
-    from lark import Token
     from ..common.utils import get_end_line
 
     ignore = ('_NL', '_INDENT', '_DEDENT', 'END', 'END_OF_FILE')
